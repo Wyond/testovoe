@@ -7,8 +7,12 @@ PROBES=${PROBES:-data/nmap-service-probes}
 LEGIT=${LEGIT:-data/legitimate}
 MAL=${MAL:-data/malicious}
 mkdir -p data
+# Pinned: nmap's master moves (on 2026-10-12 a ms-wbt-server pattern changed), and the
+# numbers in README were measured with this exact file.
+NMAP_COMMIT=3b71f8059f722723a038f37ccc08f7c5aac3d084
+NMAP_SHA256=bd1bc6b1904632c617d6cf70e1f21877f4b0abefc8db977ceaf1699accdde5ff
 if [ ! -f "$PROBES" ]; then
-  curl -fL -o "$PROBES" https://raw.githubusercontent.com/nmap/nmap/master/nmap-service-probes
+  curl -fL -o "$PROBES" "https://raw.githubusercontent.com/nmap/nmap/$NMAP_COMMIT/nmap-service-probes"
 fi
 fetch() { # target dir, archive name
   [ -d "$1" ] && return
@@ -17,6 +21,7 @@ fetch() { # target dir, archive name
 }
 fetch "$LEGIT" legitimate
 fetch "$MAL" malicious
-# The numbers in README were measured with this version of the rule file:
-# bd1bc6b1904632c617d6cf70e1f21877f4b0abefc8db977ceaf1699accdde5ff
-shasum -a 256 "$PROBES"
+got=$(shasum -a 256 "$PROBES" | cut -d' ' -f1)
+if [ "$got" != "$NMAP_SHA256" ]; then
+  echo "warning: $PROBES has SHA256 $got, README numbers were measured with $NMAP_SHA256" >&2
+fi
