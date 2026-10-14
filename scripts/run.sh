@@ -22,7 +22,7 @@ if [ -z "${WORKERS:-}" ]; then
   [ "$NCPU" -gt 1 ] && WORKERS="$WORKERS $NCPU"
 fi
 
-if [ ! -f "$PROBES" ] || [ ! -d "$LEGIT" ] || [ ! -d "$MAL" ]; then scripts/fetch_data.sh; fi
+if [ ! -f "$PROBES" ] || [ ! -d "$LEGIT" ] || [ ! -d "$MAL" ]; then PROBES=$PROBES LEGIT=$LEGIT MAL=$MAL scripts/fetch_data.sh; fi
 mkdir -p bin results
 go build -o bin/matcher ./cmd/matcher
 go test ./...

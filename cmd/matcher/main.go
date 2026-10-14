@@ -20,7 +20,7 @@ import (
 func main() {
 	log.SetFlags(0)
 	if len(os.Args) < 2 {
-		log.Fatal("usage: matcher prepare|run|check|summary [flags]")
+		log.Fatal("usage: matcher prepare|run|check|stats|summary [flags]")
 	}
 	switch cmd, args := os.Args[1], os.Args[2:]; cmd {
 	case "prepare":
@@ -31,6 +31,13 @@ func main() {
 		check(args)
 	case "summary":
 		summary(args)
+	case "stats":
+		fs := flag.NewFlagSet("stats", flag.ExitOnError)
+		c := commonFlags(fs)
+		fs.Parse(args)
+		m, s, _ := c.open()
+		defer s.Close()
+		fmt.Print(matcher.SizeProfile(m, s))
 	default:
 		log.Fatalf("unknown command %q", cmd)
 	}
