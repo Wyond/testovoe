@@ -1,0 +1,56 @@
+?   	waap-matcher/cmd/matcher	[no test files]
+ok  	waap-matcher/internal/matcher	0.432s
+== sanity: naive vs fast, 1 vs N workers, mmap vs pread
+rules: 12172 match/softmatch lines in 188 probes, 1250 services; 11365 compiled by Go regexp (11180 match, 185 softmatch; flag i 30, flag s 2598), 807 unsupported (6.6%), 0 unparsed lines
+filter: 10941 patterns behind a start-of-text prefix (6757 distinct prefixes, largest two-byte bucket 2377), 379 behind a required literal (272 distinct literals, 9 of them shorter than 4 bytes), 45 always candidates; 2142 patterns also have an end-of-text condition (length bound or last byte), 311 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+corpus: 1114166 requests, 5375 MB normalized; rule initialization 0.14s
+naive mmap  workers=10      20000 req     8.090s        2472 req/s      11.2 MB/s   11365.00 regex calls/req  20000 requests with a match
+fast  mmap  workers=1       20000 req     0.149s      134633 req/s     609.9 MB/s      13.39 regex calls/req  20000 requests with a match
+fast  mmap  workers=10      20000 req     0.023s      888287 req/s    4024.0 MB/s      13.39 regex calls/req  20000 requests with a match
+OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated
+OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated
+fast  mmap  workers=1     1114166 req     7.688s      144929 req/s     699.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  pread workers=10    1114166 req     1.510s      738096 req/s    3560.9 MB/s      13.36 regex calls/req  1114159 requests with a match
+OK   whole corpus, fast 1 worker mmap vs N workers pread: 1114166 requests, identical output lines, none missing or duplicated
+== baseline: naive, 1 worker, 100000 requests spread over the corpus; then fast on the same requests
+naive mmap  workers=1      100000 req   202.742s         493 req/s       2.1 MB/s   11365.00 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.662s      151111 req/s     652.9 MB/s      13.38 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.769s      130002 req/s     561.7 MB/s      13.38 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.786s      127240 req/s     549.7 MB/s      13.38 regex calls/req  100000 requests with a match
+== scaling: fast, whole corpus, results written to results/out.jsonl
+fast  mmap  workers=1     1114166 req     7.812s      142626 req/s     688.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=2     1114166 req     4.204s      265054 req/s    1278.7 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=3     1114166 req     3.184s      349965 req/s    1688.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=4     1114166 req     2.594s      429584 req/s    2072.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=6     1114166 req     2.130s      522978 req/s    2523.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=8     1114166 req     1.715s      649478 req/s    3133.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     1.538s      724553 req/s    3495.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=1     1114166 req     7.946s      140221 req/s     676.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=2     1114166 req     4.150s      268448 req/s    1295.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=3     1114166 req     3.334s      334189 req/s    1612.3 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=4     1114166 req     2.794s      398794 req/s    1924.0 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=6     1114166 req     2.178s      511585 req/s    2468.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=8     1114166 req     1.754s      635291 req/s    3064.9 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     1.528s      729046 req/s    3517.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=1     1114166 req     7.576s      147065 req/s     709.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=2     1114166 req     4.343s      256555 req/s    1237.7 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=3     1114166 req     3.330s      334600 req/s    1614.3 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=4     1114166 req     2.728s      408467 req/s    1970.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=6     1114166 req     2.168s      513949 req/s    2479.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=8     1114166 req     1.693s      658202 req/s    3175.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     1.559s      714739 req/s    3448.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+conversion (JSON decode + normalization + write, 10 workers): 15.72s for 1114166 requests, 7339 MB JSON -> 5375 MB normalized
+
+| label | mode | workers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| baseline | naive | 1 | 100000 | 1 | 202.742 | 202.742 | 202.742 | 493 | 2 | 1.00x | 100% |
+| baseline | fast | 1 | 100000 | 3 | 0.769 | 0.662 | 0.786 | 130002 | 562 | 1.00x | 100% |
+| full | fast | 1 | 1114166 | 3 | 7.812 | 7.576 | 7.946 | 142626 | 688 | 1.00x | 100% |
+| full | fast | 2 | 1114166 | 3 | 4.204 | 4.150 | 4.343 | 265054 | 1279 | 1.86x | 93% |
+| full | fast | 3 | 1114166 | 3 | 3.330 | 3.184 | 3.334 | 334600 | 1614 | 2.35x | 78% |
+| full | fast | 4 | 1114166 | 3 | 2.728 | 2.594 | 2.794 | 408467 | 1971 | 2.86x | 72% |
+| full | fast | 6 | 1114166 | 3 | 2.168 | 2.130 | 2.178 | 513949 | 2480 | 3.60x | 60% |
+| full | fast | 8 | 1114166 | 3 | 1.715 | 1.693 | 1.754 | 649478 | 3133 | 4.55x | 57% |
+| full | fast | 10 | 1114166 | 3 | 1.538 | 1.528 | 1.559 | 724553 | 3496 | 5.08x | 51% |
+
+prefilter vs naive, 1 worker, same 100000 requests: 0.77s vs 202.74s = 264x

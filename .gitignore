@@ -1,0 +1,6 @@
+bin/
+data/
+results/*.jsonl
+results/*.prof
+*.test
+results/decoders.log
