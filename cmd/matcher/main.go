@@ -41,7 +41,7 @@ func prepare(args []string) {
 	out := fs.String("out", "data/corpus", "output directory")
 	workers := fs.Int("workers", runtime.NumCPU(), "files decoded in parallel")
 	decoder := fs.String("decoder", "jx", "JSON decoder: jx (streaming), jxbytes (whole file in memory) or std (encoding/json)")
-	inflight := fs.Int64("inflight-mb", 2048, "JSON megabytes decoded ahead of the writer")
+	inflight := fs.Int64("inflight-mb", 1024, "JSON megabytes decoded ahead of the writer")
 	fs.Parse(args)
 	if fs.NArg() == 0 {
 		log.Fatal("usage: matcher prepare [-out dir] <json dir>...")
