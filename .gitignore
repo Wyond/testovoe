@@ -4,3 +4,4 @@ results/*.jsonl
 results/*.prof
 *.test
 results/decoders.log
+.omc/
