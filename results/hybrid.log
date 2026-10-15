@@ -1,0 +1,83 @@
+== correctness per configuration (naive vs fast on 20000 requests, 1 vs 10 workers)
+go               OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+re2              OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+rure             OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+pcre2            OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+hybrid           OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+go+excluded      OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+hybrid+excluded  OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated 
+== output compared with plain Go on the whole corpus
+re2              0 requests differ
+rure             0 requests differ
+pcre2            4 requests differ
+< {"id":1022985,"hard":["ventrilo"],"soft":[]}
+< {"id":1023058,"hard":["ventrilo"],"soft":[]}
+< {"id":1023205,"hard":["ventrilo"],"soft":[]}
+hybrid           0 requests differ
+go+excluded      611 requests differ
+< {"id":1040282,"hard":["landesk-rc","ventrilo"],"soft":[]}
+< {"id":1040288,"hard":["landesk-rc","ventrilo"],"soft":[]}
+< {"id":1040293,"hard":["landesk-rc","ventrilo"],"soft":[]}
+hybrid+excluded  611 requests differ
+< {"id":1040282,"hard":["landesk-rc","ventrilo"],"soft":[]}
+< {"id":1040288,"hard":["landesk-rc","ventrilo"],"soft":[]}
+< {"id":1040293,"hard":["landesk-rc","ventrilo"],"soft":[]}
+== timing (whole corpus, results written to a file)
+go fast  mmap  workers=1     1114166 req    11.203s       99455 req/s     479.8 MB/s      13.36 regex calls/req  1114159 requests with a match
+go fast  mmap  workers=10    1114166 req     2.290s      486547 req/s    2347.3 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=1     1114166 req    16.289s       68400 req/s     330.0 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=10    1114166 req     3.170s      351440 req/s    1695.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=1     1114166 req     8.045s      138493 req/s     668.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=10    1114166 req     1.892s      589001 req/s    2841.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=1     1114166 req   115.653s        9634 req/s      46.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=10    1114166 req    18.994s       58658 req/s     283.0 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=1     1114166 req     6.797s      163924 req/s     790.8 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=10    1114166 req     1.500s      742894 req/s    3584.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=1     1114166 req     8.688s      128236 req/s     618.7 MB/s      13.65 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=10    1114166 req     2.229s      499873 req/s    2411.6 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=1     1114166 req     6.493s      171590 req/s     827.8 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=10    1114166 req     1.803s      618105 req/s    2982.0 MB/s      13.65 regex calls/req  1114159 requests with a match
+go fast  mmap  workers=1     1114166 req     7.620s      146220 req/s     705.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+go fast  mmap  workers=10    1114166 req     1.702s      654509 req/s    3157.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=1     1114166 req    14.867s       74941 req/s     361.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=10    1114166 req     3.013s      369734 req/s    1783.8 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=1     1114166 req     8.097s      137609 req/s     663.9 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=10    1114166 req     1.819s      612420 req/s    2954.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=1     1114166 req   115.307s        9663 req/s      46.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=10    1114166 req    18.786s       59307 req/s     286.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=1     1114166 req     6.381s      174618 req/s     842.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=10    1114166 req     1.447s      769737 req/s    3713.6 MB/s      13.36 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=1     1114166 req     8.082s      137854 req/s     665.1 MB/s      13.65 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=10    1114166 req     1.351s      824956 req/s    3980.0 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=1     1114166 req     6.684s      166700 req/s     804.2 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=10    1114166 req     1.226s      908602 req/s    4383.5 MB/s      13.65 regex calls/req  1114159 requests with a match
+go fast  mmap  workers=1     1114166 req     8.419s      132345 req/s     638.5 MB/s      13.36 regex calls/req  1114159 requests with a match
+go fast  mmap  workers=10    1114166 req     1.852s      601535 req/s    2902.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=1     1114166 req    15.197s       73313 req/s     353.7 MB/s      13.36 regex calls/req  1114159 requests with a match
+re2 fast  mmap  workers=10    1114166 req     3.629s      307031 req/s    1481.3 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=1     1114166 req     8.612s      129379 req/s     624.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+rure fast  mmap  workers=10    1114166 req     2.082s      535059 req/s    2581.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=1     1114166 req   111.131s       10026 req/s      48.4 MB/s      13.36 regex calls/req  1114159 requests with a match
+pcre2 fast  mmap  workers=10    1114166 req    18.094s       61577 req/s     297.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=1     1114166 req     6.093s      182850 req/s     882.1 MB/s      13.36 regex calls/req  1114159 requests with a match
+hybrid fast  mmap  workers=10    1114166 req     1.368s      814430 req/s    3929.2 MB/s      13.36 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=1     1114166 req    11.567s       96325 req/s     464.7 MB/s      13.65 regex calls/req  1114159 requests with a match
+go+excluded fast  mmap  workers=10    1114166 req     2.192s      508356 req/s    2452.5 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=1     1114166 req     5.645s      197361 req/s     952.2 MB/s      13.65 regex calls/req  1114159 requests with a match
+hybrid+excluded fast  mmap  workers=10    1114166 req     1.619s      688319 req/s    3320.8 MB/s      13.65 regex calls/req  1114159 requests with a match
+| configuration | workers | median s | min-max s | req/s | vs go | regex calls/req | inconclusive | rule init s |
+|---|---:|---:|---|---:|---:|---:|---:|---:|
+| go | 1 | 8.419 | 7.620-11.203 | 132345 | 1.00x | 13.36 | 0 | 0.22 |
+| go | 10 | 1.852 | 1.702-2.290 | 601535 | 1.00x | 13.36 | 0 | 0.22 |
+| re2 | 1 | 15.197 | 14.867-16.289 | 73313 | 0.55x | 13.36 | 0 | 0.34 |
+| re2 | 10 | 3.170 | 3.013-3.629 | 351440 | 0.58x | 13.36 | 0 | 0.34 |
+| rure | 1 | 8.097 | 8.045-8.612 | 137609 | 1.04x | 13.36 | 0 | 3.32 |
+| rure | 10 | 1.892 | 1.819-2.082 | 589001 | 0.98x | 13.36 | 0 | 3.36 |
+| pcre2 | 1 | 115.307 | 111.131-115.653 | 9663 | 0.07x | 13.36 | 35 | 2.87 |
+| pcre2 | 10 | 18.786 | 18.094-18.994 | 59307 | 0.10x | 13.36 | 35 | 2.84 |
+| hybrid | 1 | 6.381 | 6.093-6.797 | 174618 | 1.32x | 13.36 | 0 | 0.24 |
+| hybrid | 10 | 1.447 | 1.368-1.500 | 769737 | 1.28x | 13.36 | 0 | 0.22 |
+| go+excluded | 1 | 8.688 | 8.082-11.567 | 128236 | 0.97x | 13.65 | 0 | 0.23 |
+| go+excluded | 10 | 2.192 | 1.351-2.229 | 508356 | 0.85x | 13.65 | 0 | 0.22 |
+| hybrid+excluded | 1 | 6.493 | 5.645-6.684 | 171590 | 1.30x | 13.65 | 0 | 0.23 |
+| hybrid+excluded | 10 | 1.619 | 1.226-1.803 | 688319 | 1.14x | 13.65 | 0 | 0.23 |

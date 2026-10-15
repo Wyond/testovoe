@@ -21,20 +21,24 @@ type Config struct {
 }
 
 type Result struct {
-	Engine     string  `json:"engine"`
-	Mode       string  `json:"mode"`
-	Access     string  `json:"access"`
-	Workers    int     `json:"workers"`
-	GOMAXPROCS int     `json:"gomaxprocs"`
-	Requests   int64   `json:"requests"`
-	Bytes      int64   `json:"payload_bytes"`
-	Seconds    float64 `json:"matching_with_output_seconds"`
-	ReqPerSec  float64 `json:"req_per_sec"`
-	MBPerSec   float64 `json:"mb_per_sec"`
-	RegexCalls float64 `json:"regex_calls_per_request"`
-	Matches    int64   `json:"pattern_matches"`
-	WithMatch  int64   `json:"requests_with_match"`
-	Stats      Stats   `json:"-"`
+	Engine string `json:"engine"`
+	Mode   string `json:"mode"`
+	// Inconclusive: confirmations an engine gave up on during this run (PCRE2 limits);
+	// they are reported as no match.
+	Inconclusive  uint64  `json:"inconclusive"`
+	Inconclusive0 uint64  `json:"-"`
+	Access        string  `json:"access"`
+	Workers       int     `json:"workers"`
+	GOMAXPROCS    int     `json:"gomaxprocs"`
+	Requests      int64   `json:"requests"`
+	Bytes         int64   `json:"payload_bytes"`
+	Seconds       float64 `json:"matching_with_output_seconds"`
+	ReqPerSec     float64 `json:"req_per_sec"`
+	MBPerSec      float64 `json:"mb_per_sec"`
+	RegexCalls    float64 `json:"regex_calls_per_request"`
+	Matches       int64   `json:"pattern_matches"`
+	WithMatch     int64   `json:"requests_with_match"`
+	Stats         Stats   `json:"-"`
 
 	// Hashes[k] is a hash of the output line of the k-th processed request (k indexes the
 	// sample). It lets two runs be compared per request without sorting their outputs.
@@ -82,7 +86,7 @@ func Run(m *Matcher, s *Store, cfg Config) (*Result, error) {
 		cfg.Access = "mmap"
 	}
 	const maxBatchBytes = 64 << 20
-	res := &Result{Engine: EngineName, Mode: cfg.Mode, Workers: cfg.Workers, Access: cfg.Access, Hashes: make([]uint64, total)}
+	res := &Result{Engine: m.Rules.Label(), Inconclusive0: Inconclusive(), Mode: cfg.Mode, Workers: cfg.Workers, Access: cfg.Access, Hashes: make([]uint64, total)}
 	old := runtime.GOMAXPROCS(cfg.Workers)
 	defer runtime.GOMAXPROCS(old)
 	res.GOMAXPROCS = cfg.Workers
@@ -181,6 +185,7 @@ func Run(m *Matcher, s *Store, cfg Config) (*Result, error) {
 		res.Stats.add(st)
 	}
 	res.Duplicates = dups.Load()
+	res.Inconclusive = Inconclusive() - res.Inconclusive0
 	res.Requests, res.Bytes = res.Stats.Requests, res.Stats.Bytes
 	res.Matches, res.WithMatch = res.Stats.Matches, res.Stats.WithMatch
 	res.ReqPerSec = float64(res.Requests) / res.Seconds

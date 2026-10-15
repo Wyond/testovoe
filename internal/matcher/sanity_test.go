@@ -65,7 +65,7 @@ func testMatcher(t *testing.T) *Matcher {
 	if err := os.WriteFile(path, []byte(testProbes), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	r, err := LoadRules(path)
+	r, err := LoadRules(path, Options{Engine: testEngine()})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -163,8 +163,8 @@ func TestExpectations(t *testing.T) {
 		{"ÿþ", "xff", true},        // documented difference from PCRE
 		{strings.Repeat("a", 110), "len111", false},
 		{strings.Repeat("a", 111), "len111", true},
-		{strings.Repeat("é", 56), "len111", false},                     // 112 bytes but 56 runes
-		{strings.Repeat("\xff", 111), "len111", dotMatchesInvalidUTF8}, // RE2: . never takes an invalid byte
+		{strings.Repeat("é", 56), "len111", false}, // 112 bytes but 56 runes
+		{strings.Repeat("\xff", 111), "len111", engines[testEngine()].DotMatchesInvalidUTF8}, // RE2: . never takes an invalid byte
 		{strings.Repeat("b", 264), "len264", true},
 		{strings.Repeat("b", 265), "len264", false},
 		{strings.Repeat("b", 264) + "\n", "len264", false}, // Go: $ is end of text only

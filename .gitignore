@@ -5,3 +5,4 @@ results/*.prof
 *.test
 results/decoders.log
 .omc/
+third_party/

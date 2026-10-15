@@ -8,7 +8,7 @@ import "testing"
 //
 // Skipped when data/corpus has not been prepared.
 func benchMatch(b *testing.B, fast bool) {
-	rules, err := LoadRules("../../data/nmap-service-probes")
+	rules, err := LoadRules("../../data/nmap-service-probes", Options{Engine: testEngine()})
 	if err != nil {
 		b.Skip("no rules:", err)
 	}

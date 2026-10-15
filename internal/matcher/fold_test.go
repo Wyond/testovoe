@@ -18,7 +18,7 @@ match foldmid m|^.*<address>Apache/|si
 match foldalt m=^(?:ftp ready|KO)=i
 match foldlit m|proxy-agent: squid|i
 `), 0o644)
-	r, err := LoadRules(path)
+	r, err := LoadRules(path, Options{Engine: testEngine()})
 	if err != nil || len(r.Patterns) != 4 {
 		t.Fatal(err, r.BadLines)
 	}

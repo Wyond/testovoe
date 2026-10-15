@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"fmt"
 	"math/bits"
+	"regexp"
 	"regexp/syntax"
 	"slices"
 	"sort"
@@ -53,7 +54,7 @@ type Filter struct {
 
 	// confirm[id] is what MatchFast runs for a candidate: the pattern's own regexp, or
 	// for the few rewritten ones an expression proven to match the same inputs.
-	confirm    []*Regexp
+	confirm    []Re
 	nRewritten int
 	nEnd       int
 	nFirst     int
@@ -129,10 +130,10 @@ type cond struct {
 	prefixes []lit // non-nil: anchored at 0 and starts with one of these
 	lits     []lit // non-nil: contains one of these
 	minLen   int
-	maxLen   int        // in bytes; only for patterns anchored at both ends
-	last     *[4]uint64 // non-nil: the request is non-empty and ends with one of these bytes
-	first    *[4]uint64 // same for the first byte; only for patterns anchored at the start
-	confirm  *Regexp    // non-nil: an equivalent, cheaper expression for the fast path
+	maxLen   int            // in bytes; only for patterns anchored at both ends
+	last     *[4]uint64     // non-nil: the request is non-empty and ends with one of these bytes
+	first    *[4]uint64     // same for the first byte; only for patterns anchored at the start
+	confirm  *regexp.Regexp // non-nil: an equivalent, cheaper expression for the fast path
 }
 
 func BuildFilter(r *Rules) *Filter {
@@ -355,15 +356,12 @@ func (f *Filter) Report() string {
 }
 
 func analyze(p *Pattern) cond {
-	expr := p.Source
-	if p.Flags != "" {
-		expr = "(?" + p.Flags + ")" + expr
-	}
-	// Same flags as the engine's compile, so this is the tree it was built from (for RE2,
-	// the tree Go parses from the same text; RE2's own parser accepts the same syntax).
+	expr := p.Analysis
+	// The tree Go parses from the expression the engine compiled (other engines accept
+	// the same syntax), or from the relaxed form of a recovered PCRE rule.
 	re, err := syntax.Parse(expr, syntax.Perl)
-	if err != nil {
-		return cond{}
+	if err != nil || expr == "" {
+		return cond{maxLen: 1 << 30} // nothing proven: always a candidate, of any length
 	}
 	c := cond{minLen: minRunes(re), maxLen: 1 << 30}
 	if endAnchored(re) {
@@ -387,14 +385,14 @@ func analyze(p *Pattern) cond {
 	// any prefix. Go runs the anchored form through its slow general matcher, while the
 	// bare X lets it skip ahead to X's literal prefix. The fast path confirms with X;
 	// the naive path keeps the original, so the diff between them checks this rewrite.
-	if dotMatchesInvalidUTF8 && len(re.Sub) > 2 && re.Op == syntax.OpConcat && re.Sub[0].Op == syntax.OpBeginText {
+	if engines[p.Engine].DotMatchesInvalidUTF8 && !p.Recovered && len(re.Sub) > 2 && re.Op == syntax.OpConcat && re.Sub[0].Op == syntax.OpBeginText {
 		star := re.Sub[1]
 		if star.Op == syntax.OpCapture {
 			star = star.Sub[0]
 		}
 		if star.Op == syntax.OpStar && star.Sub[0].Op == syntax.OpAnyChar {
 			tail := &syntax.Regexp{Op: syntax.OpConcat, Sub: re.Sub[2:]}
-			if cre, err := compileRegexp(tail.String()); err == nil {
+			if cre, err := regexp.Compile(tail.String()); err == nil {
 				c.confirm, re = cre, tail
 			}
 		}

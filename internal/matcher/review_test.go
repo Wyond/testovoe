@@ -3,11 +3,21 @@ package matcher
 import (
 	"fmt"
 	"math/rand"
+	"os"
 	"regexp"
 	"slices"
 	"strings"
 	"testing"
 )
+
+// testEngine is the confirming engine the tests run with: WAAP_TEST_ENGINE, default "go".
+// scripts/test_engines.sh runs the suite once per engine compiled into the binary.
+func testEngine() string {
+	if e := os.Getenv("WAAP_TEST_ENGINE"); e != "" {
+		return e
+	}
+	return "go"
+}
 
 // rulesFrom builds Rules directly from (source, flags) pairs, the way LoadRules would.
 func rulesFrom(t testing.TB, specs [][2]string) *Rules {
@@ -18,12 +28,15 @@ func rulesFrom(t testing.TB, specs [][2]string) *Rules {
 		if sp[1] != "" {
 			expr = "(?" + sp[1] + ")" + expr
 		}
-		re, err := compileRegexp(expr)
+		if _, err := regexp.Compile(expr); err != nil {
+			continue // same rule as LoadRules: only what Go accepts
+		}
+		re, err := engines[testEngine()].Compile(expr)
 		if err != nil {
 			continue
 		}
 		id := uint32(len(r.Patterns))
-		r.Patterns = append(r.Patterns, &Pattern{ID: id, Service: fmt.Sprintf("p%d", id), ServiceID: id, Source: sp[0], Flags: sp[1], Re: re})
+		r.Patterns = append(r.Patterns, &Pattern{ID: id, Service: fmt.Sprintf("p%d", id), ServiceID: id, Source: sp[0], Flags: sp[1], Re: re, Engine: testEngine(), Analysis: expr})
 		r.Services = append(r.Services, fmt.Sprintf("p%d", id))
 	}
 	return r
@@ -63,7 +76,7 @@ func TestRuneLengthBounds(t *testing.T) {
 	diff(t, m, inputs)
 	w := m.NewWorker()
 	want := map[string]string{"я": "p0", "\U0001F600": "p0", "яя": "p1", "\U0001F600яx": "p12"}
-	if dotMatchesInvalidUTF8 {
+	if engines[testEngine()].DotMatchesInvalidUTF8 {
 		want["\xff"] = "p0" // Go only: an invalid byte is one U+FFFD rune
 	}
 	for in, want := range want {
@@ -141,7 +154,7 @@ func TestDotStarRewrite(t *testing.T) {
 	m := NewMatcher(rulesFrom(t, specs))
 	notRewritten := map[string]bool{`^.*foo|bar`: true, `^(?-s:.*)foo`: true, `^.+foo`: true}
 	for id, p := range m.Rules.Patterns {
-		want := dotMatchesInvalidUTF8 && p.Flags == "s" && !notRewritten[p.Source]
+		want := engines[testEngine()].DotMatchesInvalidUTF8 && p.Flags == "s" && !notRewritten[p.Source]
 		if got := m.Filter.confirm[id] != p.Re; got != want {
 			t.Errorf("%q flags %q: rewritten=%v, want %v", p.Source, p.Flags, got, want)
 		}

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"regexp"
 	"regexp/syntax"
 	"sort"
 	"strings"
@@ -30,8 +31,21 @@ type Pattern struct {
 	Line      int
 	Source    string // regex exactly as in the file
 	Flags     string // subset of "is"
-	Re        *Regexp
+	Re        Re
+	Engine    string // engine that compiled Re
+	// Analysis is the expression the prefilter analyses, in Go syntax. Normally the
+	// pattern itself; for a rule recovered by a PCRE engine it is a relaxed version whose
+	// language contains the rule's (see relax.go).
+	Analysis  string
+	Recovered bool   // Go cannot compile the rule; it runs on Options.Excluded
 	Err       string // compile error category for unsupported patterns
+}
+
+// Options choose the confirming engine per rule.
+type Options struct {
+	Engine   string         // default engine ("go" if empty)
+	PerLine  map[int]string // overrides by line number in the rule file (from calibrate)
+	Excluded string         // engine for rules Go cannot compile; "" leaves them out
 }
 
 // Rules is the parsed file. Patterns holds only what the Go regexp engine compiled;
@@ -42,17 +56,26 @@ type Rules struct {
 	Services    []string // ServiceID -> name
 	Probes      int
 	BadLines    []string // match lines the minimal grammar could not parse
+	Options     Options
 }
 
 // LoadRules parses Probe/match/softmatch lines. Everything after the regex and its flags
 // (p/../ v/../ cpe:..) is ignored: the task only needs service names.
-func LoadRules(path string) (*Rules, error) {
+func LoadRules(path string, opt Options) (*Rules, error) {
+	if opt.Engine == "" {
+		opt.Engine = "go"
+	}
+	for _, e := range append([]string{opt.Engine, opt.Excluded}, mapValues(opt.PerLine)...) {
+		if e != "" && engines[e] == nil {
+			return nil, fmt.Errorf("engine %q is not compiled into this binary (have %v)", e, EngineNames())
+		}
+	}
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
-	r := &Rules{}
+	r := &Rules{Options: opt}
 	svcID := map[string]uint32{}
 	sc := bufio.NewScanner(f)
 	sc.Buffer(make([]byte, 1<<20), 1<<24)
@@ -91,23 +114,41 @@ func LoadRules(path string) (*Rules, error) {
 			r.Services = append(r.Services, p.Service)
 		}
 		p.ServiceID = id
-		// The source is handed to Go's regexp unchanged apart from the two nmap flags.
-		// No PCRE->RE2 rewriting: what does not compile is unsupported.
+		// The source is handed over unchanged apart from the two nmap flags. No
+		// PCRE->RE2 rewriting: a rule Go cannot compile is unsupported, unless an engine
+		// that takes PCRE syntax is configured for those rules.
 		expr := p.Source
 		if p.Flags != "" {
 			expr = "(?" + p.Flags + ")" + expr
 		}
-		re, err := compileRegexp(expr)
-		if err != nil {
-			if _, perr := syntax.Parse(expr, syntax.Perl); perr != nil {
-				p.Err = errCategory(perr, p.Source)
-			} else { // Go's parser accepts it, the engine does not
-				p.Err = EngineName + ": " + strings.SplitN(err.Error(), "\n", 2)[0]
+		if _, gerr := regexp.Compile(expr); gerr == nil {
+			name := opt.Engine
+			if e, ok := opt.PerLine[line]; ok {
+				name = e
 			}
-			r.Unsupported = append(r.Unsupported, p)
-			continue
+			re, err := engines[name].Compile(expr)
+			if err != nil {
+				p.Err = name + ": " + strings.SplitN(err.Error(), "\n", 2)[0]
+				r.Unsupported = append(r.Unsupported, p)
+				continue
+			}
+			p.Re, p.Engine, p.Analysis = re, name, expr
+		} else {
+			p.Err = errCategory(gerr, p.Source)
+			e := engines[opt.Excluded]
+			if e == nil || e.CompilePCRE == nil {
+				r.Unsupported = append(r.Unsupported, p)
+				continue
+			}
+			re, err := e.CompilePCRE(p.Source, p.Flags)
+			if err != nil {
+				p.Err += "; " + e.Name + ": " + strings.SplitN(err.Error(), "\n", 2)[0]
+				r.Unsupported = append(r.Unsupported, p)
+				continue
+			}
+			p.Re, p.Engine, p.Recovered = re, e.Name, true
+			p.Analysis = relaxPCRE(p.Source, p.Flags) // "" if it cannot be parsed: always a candidate
 		}
-		p.Re = re
 		p.ID = uint32(len(r.Patterns))
 		r.Patterns = append(r.Patterns, p)
 	}
@@ -203,8 +244,16 @@ func (r *Rules) Report() string {
 		}
 	}
 	total := len(r.Patterns) + len(r.Unsupported)
-	fmt.Fprintf(&b, "engine %s; rules: %d match/softmatch lines in %d probes, %d services; %d compiled by the engine (%d match, %d softmatch; flag i %d, flag s %d), %d unsupported (%.1f%%), %d unparsed lines\n",
-		EngineName, total, r.Probes, len(r.Services), len(r.Patterns), hard, soft, fi, fs,
+	perEngine := map[string]int{}
+	recovered := 0
+	for _, p := range r.Patterns {
+		perEngine[p.Engine]++
+		if p.Recovered {
+			recovered++
+		}
+	}
+	fmt.Fprintf(&b, "engines %v (%d recovered from the Go-unsupported set by %q); rules: %d match/softmatch lines in %d probes, %d services; %d compiled by the engine (%d match, %d softmatch; flag i %d, flag s %d), %d unsupported (%.1f%%), %d unparsed lines\n",
+		perEngine, recovered, r.Options.Excluded, total, r.Probes, len(r.Services), len(r.Patterns), hard, soft, fi, fs,
 		len(r.Unsupported), 100*float64(len(r.Unsupported))/float64(max(total, 1)), len(r.BadLines))
 	cat := map[string]int{}
 	for _, p := range r.Unsupported {
@@ -224,4 +273,24 @@ func (r *Rules) Report() string {
 		fmt.Fprintf(&b, "  unparsed %s\n", l)
 	}
 	return b.String()
+}
+
+func mapValues(m map[int]string) []string {
+	var v []string
+	for _, x := range m {
+		v = append(v, x)
+	}
+	return v
+}
+
+// Label names the engine configuration in reports and metrics.
+func (r *Rules) Label() string {
+	l := r.Options.Engine
+	if len(r.Options.PerLine) > 0 {
+		l += fmt.Sprintf("+%d-overrides", len(r.Options.PerLine))
+	}
+	if r.Options.Excluded != "" {
+		l += "+excluded:" + r.Options.Excluded
+	}
+	return l
 }

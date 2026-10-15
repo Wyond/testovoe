@@ -10,16 +10,15 @@ REPEATS=${REPEATS:-3}
 PAUSE=${PAUSE:-45}
 M=results/engines.jsonl
 mkdir -p bin results
-go build -o bin/matcher ./cmd/matcher
 CGO_ENABLED=1 go build -tags re2_cgo -o bin/matcher-re2 ./cmd/matcher 2>/dev/null
 rm -f "$M"
 run() { sleep "$PAUSE"; "$@" -corpus "$CORPUS" -probes "$PROBES" -metrics "$M" | tail -1; }
-for b in matcher matcher-re2; do
-  run bin/$b run -mode naive -workers 1 -sample 2000 -label naive-2k -out ""
+for e in go re2; do
+  run bin/matcher-re2 run -engine $e -mode naive -workers 1 -sample 2000 -label naive-2k -out ""
 done
 for r in $(seq "$REPEATS"); do
-  for b in matcher matcher-re2; do
-    for w in 1 10; do run bin/$b run -mode fast -workers $w -label full -out results/out.jsonl; done
+  for e in go re2; do
+    for w in 1 10; do run bin/matcher-re2 run -engine $e -mode fast -workers $w -label full -out results/out.jsonl; done
   done
 done
 python3 -I - "$M" <<'PY'

@@ -11,6 +11,8 @@ import (
 	"runtime"
 	"runtime/pprof"
 	"sort"
+	"strconv"
+	"strings"
 	"syscall"
 	"time"
 
@@ -20,7 +22,7 @@ import (
 func main() {
 	log.SetFlags(0)
 	if len(os.Args) < 2 {
-		log.Fatal("usage: matcher prepare|run|check|stats|summary [flags]")
+		log.Fatal("usage: matcher prepare|run|check|calibrate|stats|summary [flags]")
 	}
 	switch cmd, args := os.Args[1], os.Args[2:]; cmd {
 	case "prepare":
@@ -31,6 +33,8 @@ func main() {
 		check(args)
 	case "summary":
 		summary(args)
+	case "calibrate":
+		calibrate(args)
 	case "stats":
 		fs := flag.NewFlagSet("stats", flag.ExitOnError)
 		c := commonFlags(fs)
@@ -67,19 +71,42 @@ func prepare(args []string) {
 }
 
 type common struct {
-	corpus, probes *string
+	corpus, probes             *string
+	engine, excluded, backends *string
 }
 
 func commonFlags(fs *flag.FlagSet) common {
 	return common{
-		corpus: fs.String("corpus", "data/corpus", "directory written by prepare"),
-		probes: fs.String("probes", "data/nmap-service-probes", "nmap-service-probes file"),
+		corpus:   fs.String("corpus", "data/corpus", "directory written by prepare"),
+		probes:   fs.String("probes", "data/nmap-service-probes", "nmap-service-probes file"),
+		engine:   fs.String("engine", "go", "confirming engine for every rule: "+strings.Join(matcher.EngineNames(), ", ")),
+		excluded: fs.String("excluded", "", "engine for the rules Go cannot compile (pcre2); empty leaves them out"),
+		backends: fs.String("backends", "", "JSON {\"line\": \"engine\"} from `matcher calibrate`, overriding -engine per rule"),
 	}
 }
 
 func (c common) open() (*matcher.Matcher, *matcher.Store, float64) {
 	t := time.Now()
-	rules, err := matcher.LoadRules(*c.probes)
+	opt := matcher.Options{Engine: *c.engine, Excluded: *c.excluded}
+	if *c.backends != "" {
+		b, err := os.ReadFile(*c.backends)
+		if err != nil {
+			log.Fatal(err)
+		}
+		var per map[string]string
+		if err := json.Unmarshal(b, &per); err != nil {
+			log.Fatalf("%s: %v", *c.backends, err)
+		}
+		opt.PerLine = map[int]string{}
+		for k, v := range per {
+			n, err := strconv.Atoi(k)
+			if err != nil {
+				log.Fatalf("%s: line %q", *c.backends, k)
+			}
+			opt.PerLine[n] = v
+		}
+	}
+	rules, err := matcher.LoadRules(*c.probes, opt)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -305,5 +332,38 @@ func summary(args []string) {
 		if f := (key{k.label, "fast", 1, k.requests}); len(groups[f]) > 0 {
 			fmt.Printf("\nprefilter vs naive, 1 worker, same %d requests: %.2fs vs %.2fs = %.0fx\n", k.requests, med(f), med(k), med(k)/med(f))
 		}
+	}
+}
+
+// calibrate measures every candidate rule on every listed engine and writes the per-rule
+// choice that `run -backends` reads.
+func calibrate(args []string) {
+	fs := flag.NewFlagSet("calibrate", flag.ExitOnError)
+	c := commonFlags(fs)
+	names := fs.String("engines", strings.Join(matcher.EngineNames(), ","), "engines to compare")
+	sample := fs.Int("sample", 50000, "requests to calibrate on")
+	offset := fs.Int("offset", 1, "first request; the baseline sample starts at 0, so 1 keeps them disjoint")
+	out := fs.String("out", "results/backends.json", "per-rule engine choice, by line number")
+	fs.Parse(args)
+	m, s, _ := c.open()
+	defer s.Close()
+	list := strings.Split(*names, ",")
+	t := time.Now()
+	rows, choice, err := matcher.Calibrate(m, s, list, *sample, *offset)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("calibrated %d rules on %d requests in %.1fs; %d rules move off Go\n\n", len(rows), *sample, time.Since(t).Seconds(), len(choice))
+	fmt.Print(matcher.CalibrationReport(rows, list, 25))
+	per := map[string]string{}
+	count := map[string]int{}
+	for line, e := range choice {
+		per[strconv.Itoa(line)] = e
+		count[e]++
+	}
+	fmt.Printf("\nchosen: %v\n", count)
+	b, _ := json.MarshalIndent(per, "", " ")
+	if err := os.WriteFile(*out, b, 0o644); err != nil {
+		log.Fatal(err)
 	}
 }
