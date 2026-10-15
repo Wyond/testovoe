@@ -18,7 +18,7 @@ func rulesFrom(t testing.TB, specs [][2]string) *Rules {
 		if sp[1] != "" {
 			expr = "(?" + sp[1] + ")" + expr
 		}
-		re, err := regexp.Compile(expr)
+		re, err := compileRegexp(expr)
 		if err != nil {
 			continue
 		}
@@ -62,7 +62,11 @@ func TestRuneLengthBounds(t *testing.T) {
 		"ab", "абв", "Жук", "жук", "ЖУК", "уж", "УЖ", "ёж", "xé", "ééx", "\U0001F600яx", "aяx"}
 	diff(t, m, inputs)
 	w := m.NewWorker()
-	for in, want := range map[string]string{"я": "p0", "\U0001F600": "p0", "\xff": "p0", "яя": "p1", "\U0001F600яx": "p12"} {
+	want := map[string]string{"я": "p0", "\U0001F600": "p0", "яя": "p1", "\U0001F600яx": "p12"}
+	if dotMatchesInvalidUTF8 {
+		want["\xff"] = "p0" // Go only: an invalid byte is one U+FFFD rune
+	}
+	for in, want := range want {
 		if !slices.Contains(names(m, m.MatchFast([]byte(in), w)), want) {
 			t.Errorf("%q should match %s", in, want)
 		}
@@ -137,7 +141,7 @@ func TestDotStarRewrite(t *testing.T) {
 	m := NewMatcher(rulesFrom(t, specs))
 	notRewritten := map[string]bool{`^.*foo|bar`: true, `^(?-s:.*)foo`: true, `^.+foo`: true}
 	for id, p := range m.Rules.Patterns {
-		want := p.Flags == "s" && !notRewritten[p.Source]
+		want := dotMatchesInvalidUTF8 && p.Flags == "s" && !notRewritten[p.Source]
 		if got := m.Filter.confirm[id] != p.Re; got != want {
 			t.Errorf("%q flags %q: rewritten=%v, want %v", p.Source, p.Flags, got, want)
 		}

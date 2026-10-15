@@ -163,8 +163,8 @@ func TestExpectations(t *testing.T) {
 		{"ÿþ", "xff", true},        // documented difference from PCRE
 		{strings.Repeat("a", 110), "len111", false},
 		{strings.Repeat("a", 111), "len111", true},
-		{strings.Repeat("é", 56), "len111", false}, // 112 bytes but 56 runes
-		{strings.Repeat("\xff", 111), "len111", true},
+		{strings.Repeat("é", 56), "len111", false},                     // 112 bytes but 56 runes
+		{strings.Repeat("\xff", 111), "len111", dotMatchesInvalidUTF8}, // RE2: . never takes an invalid byte
 		{strings.Repeat("b", 264), "len264", true},
 		{strings.Repeat("b", 265), "len264", false},
 		{strings.Repeat("b", 264) + "\n", "len264", false}, // Go: $ is end of text only

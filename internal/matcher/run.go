@@ -21,6 +21,7 @@ type Config struct {
 }
 
 type Result struct {
+	Engine     string  `json:"engine"`
 	Mode       string  `json:"mode"`
 	Access     string  `json:"access"`
 	Workers    int     `json:"workers"`
@@ -81,7 +82,7 @@ func Run(m *Matcher, s *Store, cfg Config) (*Result, error) {
 		cfg.Access = "mmap"
 	}
 	const maxBatchBytes = 64 << 20
-	res := &Result{Mode: cfg.Mode, Workers: cfg.Workers, Access: cfg.Access, Hashes: make([]uint64, total)}
+	res := &Result{Engine: EngineName, Mode: cfg.Mode, Workers: cfg.Workers, Access: cfg.Access, Hashes: make([]uint64, total)}
 	old := runtime.GOMAXPROCS(cfg.Workers)
 	defer runtime.GOMAXPROCS(old)
 	res.GOMAXPROCS = cfg.Workers

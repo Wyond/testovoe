@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"regexp"
 	"regexp/syntax"
 	"sort"
 	"strings"
@@ -31,7 +30,7 @@ type Pattern struct {
 	Line      int
 	Source    string // regex exactly as in the file
 	Flags     string // subset of "is"
-	Re        *regexp.Regexp
+	Re        *Regexp
 	Err       string // compile error category for unsupported patterns
 }
 
@@ -98,9 +97,13 @@ func LoadRules(path string) (*Rules, error) {
 		if p.Flags != "" {
 			expr = "(?" + p.Flags + ")" + expr
 		}
-		re, err := regexp.Compile(expr)
+		re, err := compileRegexp(expr)
 		if err != nil {
-			p.Err = errCategory(err, p.Source)
+			if _, perr := syntax.Parse(expr, syntax.Perl); perr != nil {
+				p.Err = errCategory(perr, p.Source)
+			} else { // Go's parser accepts it, the engine does not
+				p.Err = EngineName + ": " + strings.SplitN(err.Error(), "\n", 2)[0]
+			}
 			r.Unsupported = append(r.Unsupported, p)
 			continue
 		}
@@ -200,8 +203,8 @@ func (r *Rules) Report() string {
 		}
 	}
 	total := len(r.Patterns) + len(r.Unsupported)
-	fmt.Fprintf(&b, "rules: %d match/softmatch lines in %d probes, %d services; %d compiled by Go regexp (%d match, %d softmatch; flag i %d, flag s %d), %d unsupported (%.1f%%), %d unparsed lines\n",
-		total, r.Probes, len(r.Services), len(r.Patterns), hard, soft, fi, fs,
+	fmt.Fprintf(&b, "engine %s; rules: %d match/softmatch lines in %d probes, %d services; %d compiled by the engine (%d match, %d softmatch; flag i %d, flag s %d), %d unsupported (%.1f%%), %d unparsed lines\n",
+		EngineName, total, r.Probes, len(r.Services), len(r.Patterns), hard, soft, fi, fs,
 		len(r.Unsupported), 100*float64(len(r.Unsupported))/float64(max(total, 1)), len(r.BadLines))
 	cat := map[string]int{}
 	for _, p := range r.Unsupported {
