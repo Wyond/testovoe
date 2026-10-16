@@ -59,7 +59,7 @@ scripts/run.sh                                     # основной режим
 - **Быстрая проверка (~3 мин):** `QUICK=1`.
 - **Время полного прогона:** ~23 мин до серии читателей, она добавляет 16 коротких прогонов.
 - **Кэш baseline:** наивный проход переиспользуется, пока не изменились код, правила, движки или корпус.
-- **Один потоковый прогон:** `bin/matcher stream -parser simdjson -backends results/backends.json -excluded pcre2 -workers 10 -readers 4 <Legitimate> <Malicious>`; `READERS=1` — один читатель.
+- **Один потоковый прогон:** `bin/matcher stream -parser simdjson -backends config/backends.json -excluded pcre2 -workers 10 -readers 4 <Legitimate> <Malicious>`; `READERS=1` — один читатель.
 
 ## Как устроено
 

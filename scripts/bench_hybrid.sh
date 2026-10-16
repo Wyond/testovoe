@@ -12,16 +12,16 @@ PAUSE=${PAUSE:-30}
 B=bin/matcher-all
 M=results/hybrid.jsonl
 go build -tags 're2_cgo rure pcre2' -o $B ./cmd/matcher 2>/dev/null
-[ -f results/backends.json ] || $B calibrate -engines go,re2,rure -sample 50000 -offset 1 -out results/backends.json
+[ -f config/backends.json ] || $B calibrate -engines go,re2,rure -sample 50000 -offset 1 -out config/backends.json
 rm -f "$M"
 configs=(
   "go|-engine go"
   "re2|-engine re2"
   "rure|-engine rure"
   "pcre2|-engine pcre2"
-  "hybrid|-engine go -backends results/backends.json"
+  "hybrid|-engine go -backends config/backends.json"
   "go+excluded|-engine go -excluded pcre2"
-  "hybrid+excluded|-engine go -backends results/backends.json -excluded pcre2"
+  "hybrid+excluded|-engine go -backends config/backends.json -excluded pcre2"
 )
 echo "== correctness per configuration (naive vs fast on 20000 requests, 1 vs 10 workers)"
 for c in "${configs[@]}"; do

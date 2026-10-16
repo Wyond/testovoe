@@ -20,7 +20,7 @@
 # The main demonstration parses JSON with simdjson (SIMD; NEON on Apple Silicon) and
 # fails loudly if it is not installed, rather than quietly measuring jx; jx is the
 # control (PARSER=jx). Native matcher parts, used when installed (brew install re2 pcre2
-# simdjson pkg-config rust): the per-rule engines from results/backends.json and PCRE2
+# simdjson pkg-config rust): the per-rule engines from config/backends.json and PCRE2
 # for the 807 rules Go cannot compile; without them the matcher is Go regexp.
 #
 # Output: results/summary.md, results/metrics.jsonl (one line per run), results/env.txt.
@@ -62,7 +62,7 @@ if [ -n "$TAGS" ]; then
 else
   go build -o bin/matcher ./cmd/matcher
 fi
-case " $TAGS " in *" pcre2 "*) MAIN=(-backends results/backends.json -excluded pcre2); MAIN_LABEL=hybrid+pcre2 ;; *) MAIN=(); MAIN_LABEL=go ;; esac
+case " $TAGS " in *" pcre2 "*) MAIN=(-backends config/backends.json -excluded pcre2); MAIN_LABEL=hybrid+pcre2 ;; *) MAIN=(); MAIN_LABEL=go ;; esac
 PARSER=${PARSER:-simdjson}
 READERS=${READERS:-4} # files read and split in parallel in the streaming mode
 if [ "$PARSER" = simdjson ]; then
@@ -96,7 +96,7 @@ rm -f "$M"
 stream() { sleep "$PAUSE"; bin/matcher stream "${C[@]}" -readers "$READERS" -metrics "$M" "$@" "${INPUT[@]}" | grep -A1 '^stream' | cut -c1-250; }
 run() { sleep "$PAUSE"; bin/matcher run "${C[@]}" -corpus "$CORPUS" -metrics "$M" "$@" | tail -1; }
 
-if [ "${MAIN_LABEL}" != go ] && [ ! -f results/backends.json ]; then
+if [ "${MAIN_LABEL}" != go ] && [ ! -f config/backends.json ]; then
   NEED_CALIBRATION=1
 fi
 
@@ -107,7 +107,7 @@ if [ ! -f "$CORPUS/manifest.json" ] || [ -n "${FORCE_PREPARE:-}" ]; then
 fi
 if [ -n "${NEED_CALIBRATION:-}" ]; then
   echo "== calibrate: per-rule engine on 50000 requests disjoint from the baseline sample"
-  bin/matcher calibrate -probes "$PROBES" -corpus "$CORPUS" -engines go,re2,rure -sample 50000 -offset 1 -out results/backends.json | tail -3
+  bin/matcher calibrate -probes "$PROBES" -corpus "$CORPUS" -engines go,re2,rure -sample 50000 -offset 1 -out config/backends.json | tail -3
 fi
 
 echo "== 1. end-to-end streaming: correctness"
@@ -162,14 +162,14 @@ if [ "$MAIN_LABEL" != go ]; then
   # Byte-mode PCRE2 on every rule, no prefilter: stands in for nmap's own matching.
   ORACLE=${ORACLE:-50000}; [ -n "${QUICK:-}" ] && ORACLE=5000
   echo "== 2. matcher-only: comparison with nmap semantics (PCRE2 on bytes), $ORACLE requests (0 = all)"
-  bin/matcher oracle "${C[@]}" -corpus "$CORPUS" -sample "$ORACLE" | sed -n '/^reference/,$p'
+  bin/matcher oracle "${C[@]}" -corpus "$CORPUS" -sample "$ORACLE" | sed -n '/^эталон/,$p'
 fi
 
 echo "== 2. matcher-only: baseline, naive single-threaded, $BASELINE requests spread over the corpus"
 # The naive pass is slow by definition and depends only on the code, the rules, the engine
 # configuration and the corpus; it is reused while none of them changes.
 KEY=$( { cat internal/matcher/*.go internal/matcher/*.cpp cmd/matcher/*.go go.sum 2>/dev/null; shasum -a 256 "$PROBES" "$CORPUS/corpus.idx";
-         echo "$TAGS ${MAIN[*]-} $BASELINE"; [ -f results/backends.json ] && cat results/backends.json;
+         echo "$TAGS ${MAIN[*]-} $BASELINE"; [ -f config/backends.json ] && cat config/backends.json;
          pkg-config --modversion re2 libpcre2-8 simdjson 2>/dev/null || true; } | shasum -a 256 | cut -c1-16)
 if [ -f "results/cache/baseline-$KEY.jsonl" ] && [ -z "${FORCE_BASELINE:-}" ]; then
   echo "     reusing results/cache/baseline-$KEY (same code, rules, engines, corpus; FORCE_BASELINE=1 recomputes)"

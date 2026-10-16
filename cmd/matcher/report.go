@@ -120,7 +120,7 @@ func calibrate(args []string) {
 	names := fs.String("engines", strings.Join(matcher.EngineNames(), ","), "engines to compare")
 	sample := fs.Int("sample", 50000, "requests to calibrate on")
 	offset := fs.Int("offset", 1, "first request; the baseline sample starts at 0, so 1 keeps them disjoint")
-	out := fs.String("out", "results/backends.json", "per-rule engine choice, by line number")
+	out := fs.String("out", "config/backends.json", "per-rule engine choice, by line number")
 	fs.Parse(args)
 	m, s, _ := c.open()
 	defer s.Close()
