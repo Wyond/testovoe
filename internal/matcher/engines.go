@@ -4,10 +4,35 @@ import (
 	"regexp"
 	"sort"
 	"sync/atomic"
+	"unicode/utf8"
 )
 
 // Re is a compiled pattern of any engine. Implementations must be safe for concurrent use.
 type Re interface{ Match([]byte) bool }
+
+// utf8Aware is implemented by engines whose behaviour depends on whether the input is
+// valid UTF-8 (PCRE2 picks JIT or the interpreter by it). The matcher computes validity
+// once per request instead of once per call.
+type utf8Aware interface {
+	MatchUTF8(b []byte, valid bool) bool
+}
+
+// reqInput caches per-request facts that some engines want.
+type reqInput struct {
+	b     []byte
+	known bool
+	valid bool
+}
+
+func (in *reqInput) match(re Re) bool {
+	if u, ok := re.(utf8Aware); ok {
+		if !in.known {
+			in.valid, in.known = utf8.Valid(in.b), true
+		}
+		return u.MatchUTF8(in.b, in.valid)
+	}
+	return re.Match(in.b)
+}
 
 // Engine is one confirming regex engine. Go's regexp is always available; the others
 // are compiled in with build tags (re2_cgo, rure, pcre2) and register themselves.

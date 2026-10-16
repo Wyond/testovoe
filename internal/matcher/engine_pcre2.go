@@ -20,19 +20,17 @@ static void init_limits(uint32_t match_limit, uint32_t depth_limit) {
 
 static pcre2_code *compile(const char *pat, size_t n, uint32_t opts, int *err, size_t *off) {
 	pcre2_code *re = pcre2_compile((PCRE2_SPTR)pat, n, opts, err, off, NULL);
-	// JIT is opt-in: PCRE2 10.49's JIT with PCRE2_MATCH_INVALID_UTF reads past the end
-	// of a subject that ends in an invalid UTF-8 byte (\b$ on "a\xff" depends on the byte
-	// after the buffer; the interpreter is correct). See docs/EXPERIMENTS.md E19.
 	const char *jit = getenv("WAAP_PCRE2_JIT");
-	if (re && jit && jit[0] == '1') pcre2_jit_compile(re, PCRE2_JIT_COMPLETE);
+	if (re && !(jit && jit[0] == '0')) pcre2_jit_compile(re, PCRE2_JIT_COMPLETE);
 	return re;
 }
 
 // Match data per call keeps this thread-safe without per-thread state; it is one small
-// allocation next to a match that the prefilter already made rare.
-static int match(pcre2_code *re, const char *s, size_t n) {
+// allocation next to a match that the prefilter already made rare. nojit forces the
+// interpreter even for a JIT-compiled pattern.
+static int match(pcre2_code *re, const char *s, size_t n, int nojit) {
 	pcre2_match_data *md = pcre2_match_data_create(1, NULL);
-	int rc = pcre2_match(re, (PCRE2_SPTR)s, n, 0, 0, md, mctx);
+	int rc = pcre2_match(re, (PCRE2_SPTR)s, n, 0, nojit ? PCRE2_NO_JIT : 0, md, mctx);
 	pcre2_match_data_free(md);
 	return rc;
 }
@@ -44,6 +42,7 @@ import "C"
 import (
 	"fmt"
 	"regexp/syntax"
+	"unicode/utf8"
 	"unsafe"
 )
 
@@ -56,18 +55,32 @@ const (
 
 type pcreRe struct{ code *C.pcre2_code }
 
-func (r *pcreRe) Match(b []byte) bool {
+// JIT is used only on valid UTF-8. PCRE2 10.49's JIT with PCRE2_MATCH_INVALID_UTF reads
+// past the end of a subject that ends in an invalid UTF-8 byte (\b$ on "a\xff" depends on
+// the byte after the buffer), while the interpreter is correct (docs/EXPERIMENTS.md E19).
+// Invalid input therefore goes to the interpreter. WAAP_PCRE2_JIT=0 disables JIT.
+func (r *pcreRe) Match(b []byte) bool { return r.MatchUTF8(b, utf8.Valid(b)) }
+
+// MatchUTF8 lets the matcher pass the validity it computed once per request.
+func (r *pcreRe) MatchUTF8(b []byte, valid bool) bool {
 	var p *C.char
 	if len(b) > 0 {
 		p = (*C.char)(unsafe.Pointer(&b[0]))
 	}
-	rc := C.match(r.code, p, C.size_t(len(b)))
+	nojit := C.int(0)
+	if !valid {
+		nojit = 1
+	}
+	rc := C.match(r.code, p, C.size_t(len(b)), nojit)
+	if rc == C.PCRE2_ERROR_JIT_STACKLIMIT { // the interpreter has no JIT stack: retry there
+		rc = C.match(r.code, p, C.size_t(len(b)), 1)
+	}
 	switch {
 	case rc >= 0:
 		return true
 	case rc == C.PCRE2_ERROR_NOMATCH:
 		return false
-	default: // match/depth limit, JIT stack, ...
+	default: // match or depth limit
 		inconclusive.Add(1)
 		return false
 	}

@@ -87,3 +87,33 @@ func TestPCRE2Limit(t *testing.T) {
 		t.Error("the match limit was not reported as inconclusive")
 	}
 }
+
+// The PCRE2 JIT bug (E19): on a subject ending in an invalid byte, JIT's answer depended
+// on the memory after the buffer. Such subjects go to the interpreter, so the answer
+// must be the same however the bytes after the slice look.
+func TestPCRE2InvalidTailIsDeterministic(t *testing.T) {
+	e := engines["pcre2"]
+	if e == nil {
+		t.Skip("built without -tags pcre2")
+	}
+	for _, src := range []string{`\b$`, `((?:(?:\b|Server: )){1,3}$)`} {
+		re, err := e.Compile(src)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, in := range []string{"KK1SERVER: \xff", "a\xff", "abc"} {
+			want, differ := re.Match([]byte(in)), 0
+			for i := 0; i < 2000; i++ {
+				b := make([]byte, len(in), len(in)+8)
+				copy(b, in)
+				b = append(b, "zzzzzzzz"[:i%8]...)[:len(in)] // vary what lies after the end
+				if re.Match(b) != want {
+					differ++
+				}
+			}
+			if differ > 0 || (in != "abc" && want) {
+				t.Errorf("%q on %q: first answer %v, %d of 2000 calls disagreed", src, in, want, differ)
+			}
+		}
+	}
+}

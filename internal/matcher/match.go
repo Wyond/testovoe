@@ -62,8 +62,9 @@ func (m *Matcher) NewWorker() *Worker {
 // MatchNaive runs every supported pattern. It is the reference for MatchFast.
 func (m *Matcher) MatchNaive(req []byte, w *Worker) []uint32 {
 	w.ids = w.ids[:0]
+	in := reqInput{b: req}
 	for _, p := range m.Rules.Patterns {
-		if p.Re.Match(req) {
+		if in.match(p.Re) {
 			w.ids = append(w.ids, p.ID)
 		}
 	}
@@ -78,11 +79,12 @@ func (m *Matcher) MatchFast(req []byte, w *Worker) []uint32 {
 	m.Filter.candidates(req, w)
 	w.ids = w.ids[:0]
 	confirm := m.Filter.confirm
+	in := reqInput{b: req}
 	for wi, x := range w.cand {
 		for ; x != 0; x &= x - 1 {
 			id := uint32(wi<<6 + bits.TrailingZeros64(x))
 			w.Stats.RegexCalls++
-			if confirm[id].Match(req) {
+			if in.match(confirm[id]) {
 				w.ids = append(w.ids, id)
 			}
 		}
