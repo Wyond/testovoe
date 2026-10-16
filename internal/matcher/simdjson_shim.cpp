@@ -14,6 +14,7 @@ struct waap_sj {
 	ondemand::parser parser;
 	std::string hdr;
 	std::string err;
+	long long growths = 0, growth_bytes = 0; // C++ heap growth, invisible to Go's statistics
 };
 
 static long long fail(waap_sj *h, error_code e, const char *where) {
@@ -127,6 +128,14 @@ const char *waap_sj_backend(void) {
 // -1: rejected, waap_sj_error explains.
 long long waap_sj_normalize(void *hp, const char *msg, size_t len, size_t cap, char *out, size_t outcap, size_t *outlen) {
 	waap_sj *h = (waap_sj *)hp;
+	size_t pcap0 = h->parser.capacity(), hcap0 = h->hdr.capacity();
+	struct track { // counts buffer growth on every way out of this function
+		waap_sj *h; size_t pcap0, hcap0;
+		~track() {
+			if (h->parser.capacity() > pcap0) { h->growths++; h->growth_bytes += h->parser.capacity() - pcap0; }
+			if (h->hdr.capacity() > hcap0) { h->growths++; h->growth_bytes += h->hdr.capacity() - hcap0; }
+		}
+	} tr{h, pcap0, hcap0};
 	ondemand::document doc;
 	error_code e = h->parser.iterate(padded_string_view(msg, len, cap)).get(doc);
 	if (e) return fail(h, e, "iterate");
@@ -186,6 +195,26 @@ long long waap_sj_normalize(void *hp, const char *msg, size_t len, size_t cap, c
 	memcpy(p, body.data(), body.size()); p += body.size();
 	*outlen = (size_t)(p - out);
 	return 0;
+}
+
+void waap_sj_growths(void *hp, long long *n, long long *bytes) {
+	waap_sj *h = (waap_sj *)hp;
+	*n = h->growths; *bytes = h->growth_bytes;
+	h->growths = h->growth_bytes = 0;
+}
+
+void waap_noop(void) {}
+
+// Benchmark: every message in one call. Returns the total output size, or -1.
+long long waap_sj_bench(void *h, const char *base, const size_t *offs, const size_t *lens, size_t n, size_t total, char *out, size_t outcap) {
+	long long sum = 0;
+	for (size_t i = 0; i < n; i++) {
+		size_t outlen = 0;
+		long long r = waap_sj_normalize(h, base + offs[i], lens[i], total - offs[i], out, outcap, &outlen);
+		if (r != 0) return -1;
+		sum += (long long)outlen;
+	}
+	return sum;
 }
 
 } // extern "C"

@@ -35,6 +35,36 @@ type msgParser interface {
 	// trim drops buffers that grew past the normal size, so that one huge message does
 	// not stay allocated for the rest of the run.
 	trim()
+	stats() ParserStats
+}
+
+// ParserStats says which backend actually parsed the messages. A SIMD parser that
+// silently handed everything to its fallback would show up here.
+type ParserStats struct {
+	Primary      string           `json:"primary"`       // backend meant to parse every message
+	PrimaryMsgs  int64            `json:"primary_msgs"`  // messages it parsed
+	FallbackMsgs int64            `json:"fallback_msgs"` // messages it refused, parsed by jx
+	Reasons      map[string]int64 `json:"fallback_reasons,omitempty"`
+	// Buffers the C++ side grew (simdjson's parser, the header string). Go's allocation
+	// statistics, and therefore -benchmem, do not see C/C++ heap allocations at all.
+	NativeGrowths     int64 `json:"native_growths"`
+	NativeGrowthBytes int64 `json:"native_growth_bytes"`
+}
+
+func (s *ParserStats) add(o ParserStats) {
+	if s.Primary == "" {
+		s.Primary = o.Primary
+	}
+	s.PrimaryMsgs += o.PrimaryMsgs
+	s.FallbackMsgs += o.FallbackMsgs
+	s.NativeGrowths += o.NativeGrowths
+	s.NativeGrowthBytes += o.NativeGrowthBytes
+	for k, v := range o.Reasons {
+		if s.Reasons == nil {
+			s.Reasons = map[string]int64{}
+		}
+		s.Reasons[k] += v
+	}
 }
 
 const jsonPadding = 64
@@ -65,13 +95,17 @@ func ParserBackend(name string) string {
 }
 
 type jxParser struct {
-	d   *jx.Decoder
-	obj *jxObject
+	d    *jx.Decoder
+	obj  *jxObject
+	msgs int64
 }
 
 func newJxParser() *jxParser { return &jxParser{d: jx.DecodeBytes(nil), obj: newJxObject()} }
 
+func (p *jxParser) stats() ParserStats { return ParserStats{Primary: "jx", PrimaryMsgs: p.msgs} }
+
 func (p *jxParser) normalize(msg, dst []byte) ([]byte, error) {
+	p.msgs++
 	p.d.ResetBytes(msg)
 	if p.d.Next() != jx.Object {
 		return dst, errors.New("array element is not a JSON object")
@@ -84,9 +118,6 @@ func (p *jxParser) trim() {
 		p.obj = newJxObject()
 	}
 }
-
-// jsonFallbacks counts messages a SIMD parser handed back to jx (see simdjson.go).
-var jsonFallbacks atomic.Int64
 
 // maxKeptBuffer: a worker keeps buffers up to this size between messages.
 const maxKeptBuffer = 8 << 20
@@ -200,6 +231,7 @@ func objectEnd(b []byte, i int) int {
 
 type StreamConfig struct {
 	Mode       string // "fast" or "naive"
+	SplitOnly  bool   // read and find element boundaries only: no parsing, matching or output
 	Parser     string // key of parsers
 	Workers    int
 	Out        io.Writer
@@ -221,7 +253,8 @@ type StreamResult struct {
 	Allocs            uint64
 	NumGC             uint32
 	MaxChunk          int
-	Fallbacks         int64 // messages the SIMD parser rejected and jx parsed instead
+	Parse             ParserStats
+	SplitOnly         bool
 }
 
 type streamJob struct {
@@ -262,7 +295,6 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 		Parser: cfg.Parser, Backend: info.Backend(), Files: len(paths)}
 	var ms0 runtime.MemStats
 	runtime.ReadMemStats(&ms0)
-	fallbacks0 := jsonFallbacks.Load()
 
 	var (
 		jobs     = make(chan *streamJob, cfg.QueueJobs)
@@ -276,6 +308,7 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 		wg       sync.WaitGroup
 		stats    = make([]Stats, cfg.Workers)
 		idle     = make([]time.Duration, cfg.Workers)
+		pstats   = make([]ParserStats, cfg.Workers)
 	)
 	fail := func(err error) { failed.CompareAndSwap(nil, &err); cond.Broadcast() }
 	if cfg.Out != nil {
@@ -336,6 +369,11 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 					release(j)
 					continue
 				}
+				if cfg.SplitOnly { // measures reading and boundary finding alone
+					w.Stats.Requests += int64(len(j.spans))
+					release(j)
+					continue
+				}
 				j.hashes = make([]uint64, len(j.spans))
 				w.out = w.out[:0]
 				for k, sp := range j.spans {
@@ -379,6 +417,7 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 				done <- j
 			}
 			stats[wi] = w.Stats
+			pstats[wi] = p.stats()
 		}()
 	}
 
@@ -524,6 +563,19 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 		return nil, *e
 	}
 
+	if cfg.SplitOnly {
+		collected = nil
+		next = 0
+		for _, st := range stats {
+			res.Stats.add(st)
+		}
+		res.Requests = res.Stats.Requests
+		res.ReqPerSec = float64(res.Requests) / res.Seconds
+		res.MBPerSec = float64(res.InputBytes) / 1e6 / res.Seconds
+		res.ReaderWaitSec, res.ReadSec, res.SplitSec, res.ReadStallSec = waitDur.Seconds(), readDur.Seconds(), splitDur.Seconds(), readStall.Seconds()
+		res.SplitOnly = true
+		return res, nil
+	}
 	// Every id from 0 to next-1 must have been processed exactly once.
 	sort.Slice(collected, func(a, b int) bool { return collected[a].first < collected[b].first })
 	res.Hashes = make([]uint64, 0, next)
@@ -548,7 +600,9 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 	res.ReaderWaitSec, res.ReadSec, res.SplitSec = waitDur.Seconds(), readDur.Seconds(), splitDur.Seconds()
 	res.ReadStallSec = readStall.Seconds()
 	res.Inconclusive = Inconclusive() - res.Inconclusive0
-	res.Fallbacks = jsonFallbacks.Load() - fallbacks0
+	for _, ps := range pstats {
+		res.Parse.add(ps)
+	}
 	res.Requests, res.Bytes = res.Stats.Requests, res.Stats.Bytes
 	res.Matches, res.WithMatch = res.Stats.Matches, res.Stats.WithMatch
 	res.ReqPerSec = float64(res.Requests) / res.Seconds

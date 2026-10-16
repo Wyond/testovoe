@@ -398,6 +398,7 @@ func stream(args []string) {
 	label := fs.String("label", "", "free-form label stored with the metrics")
 	cpuProf := fs.String("cpuprofile", "", "write a CPU profile")
 	memProf := fs.String("memprofile", "", "write an allocation profile (every allocation sampled)")
+	splitOnly := fs.Bool("split-only", false, "only read the files and find element boundaries (cost of message splitting)")
 	fs.Parse(args)
 	if fs.NArg() == 0 {
 		log.Fatal("usage: matcher stream [flags] <json dir>...")
@@ -410,7 +411,7 @@ func stream(args []string) {
 	m := c.rules()
 	initSec := time.Since(t).Seconds()
 	fmt.Printf("parser %s: %s; %d files; rule initialization %.2fs\n", *parser, matcher.ParserBackend(*parser), len(paths), initSec)
-	cfg := matcher.StreamConfig{Mode: *mode, Parser: *parser, Workers: *workers, ChunkSize: *chunk, QueueBytes: *queueMB << 20}
+	cfg := matcher.StreamConfig{Mode: *mode, Parser: *parser, Workers: *workers, ChunkSize: *chunk, QueueBytes: *queueMB << 20, SplitOnly: *splitOnly}
 	var outF *os.File
 	if *outPath != "" {
 		if outF, err = os.Create(*outPath); err != nil {
@@ -448,10 +449,21 @@ func stream(args []string) {
 	}
 	var ru syscall.Rusage
 	syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
-	fmt.Printf("stream %-8s workers=%-2d %9d req  %8.3fs  %9.0f req/s  %7.0f MB/s JSON  %6.2f regex calls/req  alloc %.0f MB (%.1f allocs/req)  GC %d  peak RSS %.2f GB  fallbacks %d  read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs; workers idle %.2fs total\n",
+	if r.SplitOnly {
+		fmt.Printf("split-only workers=%-2d %9d messages  %8.3fs  %9.0f msg/s  %7.0f MB/s JSON  read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs\n",
+			*workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec)
+		return
+	}
+	ps := r.Parse
+	fmt.Printf("stream %-8s workers=%-2d %9d req  %8.3fs  %9.0f req/s  %7.0f MB/s JSON  %6.2f regex calls/req  Go alloc %.0f MB (%.2f allocs/req)  GC %d  peak RSS %.2f GB\n",
 		*parser, *workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.RegexCalls, float64(r.AllocBytes)/1e6,
-		float64(r.Allocs)/float64(max(r.Requests, 1)), r.NumGC, float64(ru.Maxrss)/(1<<30), r.Fallbacks,
+		float64(r.Allocs)/float64(max(r.Requests, 1)), r.NumGC, float64(ru.Maxrss)/(1<<30))
+	fmt.Printf("       parsed by %s: %d, fallback to jx: %d %v; C++ buffer growths %d (%.0f MB, not in Go alloc); read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs; workers idle %.2fs total\n",
+		ps.Primary, ps.PrimaryMsgs, ps.FallbackMsgs, ps.Reasons, ps.NativeGrowths, float64(ps.NativeGrowthBytes)/1e6,
 		r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec, r.WorkerIdleSec)
+	if ps.PrimaryMsgs+ps.FallbackMsgs != r.Requests {
+		log.Fatalf("parser counters cover %d messages, %d were processed", ps.PrimaryMsgs+ps.FallbackMsgs, r.Requests)
+	}
 	if *metrics != "" {
 		rec := struct {
 			*matcher.StreamResult

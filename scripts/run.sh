@@ -5,7 +5,8 @@
 #   LEGIT=/path/Legitimate MAL=/path/Malicious scripts/run.sh
 #   QUICK=1 scripts/run.sh                                 # ~2-3 min smoke run, not for the README
 #   WORKERS="1 2 4 8" REPEATS=3 BASELINE=100000 PAUSE=0 scripts/run.sh
-#   ENGINES=go scripts/run.sh                              # plain Go and jx only, no native libraries
+#   PARSER=jx scripts/run.sh                               # control run: jx instead of simdjson
+#   ENGINES=go PARSER=jx scripts/run.sh                    # no native libraries at all
 #
 # Two modes are measured and reported separately:
 #
@@ -14,9 +15,11 @@
 #   2. Matcher-only: the same requests prepared once into a binary corpus; JSON cost is
 #      excluded. This is also where the single-threaded naive baseline runs.
 #
-# Native parts, used when installed (brew install re2 pcre2 simdjson pkg-config rust):
-# the per-rule engines from results/backends.json, PCRE2 for the 807 rules Go cannot
-# compile, and simdjson as the JSON parser. Without them: Go regexp and jx.
+# The main demonstration parses JSON with simdjson (SIMD; NEON on Apple Silicon) and
+# fails loudly if it is not installed, rather than quietly measuring jx; jx is the
+# control (PARSER=jx). Native matcher parts, used when installed (brew install re2 pcre2
+# simdjson pkg-config rust): the per-rule engines from results/backends.json and PCRE2
+# for the 807 rules Go cannot compile; without them the matcher is Go regexp.
 #
 # Output: results/summary.md, results/metrics.jsonl (one line per run), results/env.txt.
 set -euo pipefail
@@ -58,7 +61,13 @@ else
   go build -o bin/matcher ./cmd/matcher
 fi
 case " $TAGS " in *" pcre2 "*) MAIN=(-backends results/backends.json -excluded pcre2); MAIN_LABEL=hybrid+pcre2 ;; *) MAIN=(); MAIN_LABEL=go ;; esac
-case " $TAGS " in *" simdjson "*) PARSER=simdjson ;; *) PARSER=jx ;; esac
+PARSER=${PARSER:-simdjson}
+if [ "$PARSER" = simdjson ]; then
+  case " $TAGS " in *" simdjson "*) ;; *)
+    echo "simdjson is not available (brew install simdjson pkg-config); PARSER=jx scripts/run.sh runs the control instead" >&2
+    exit 1 ;;
+  esac
+fi
 echo "build tags: [${TAGS# }]; matcher: $MAIN_LABEL ${MAIN[*]-}; JSON parser: $PARSER"
 
 echo "== tests"
@@ -81,7 +90,7 @@ C=(-probes "$PROBES" ${MAIN[@]+"${MAIN[@]}"}) # bash 3.2 (macOS) rejects "${a[@]
 INPUT=("$LEGIT" "$MAL")
 M=results/metrics.jsonl
 rm -f "$M"
-stream() { sleep "$PAUSE"; bin/matcher stream "${C[@]}" -metrics "$M" "$@" "${INPUT[@]}" | grep '^stream' | cut -c1-230; }
+stream() { sleep "$PAUSE"; bin/matcher stream "${C[@]}" -metrics "$M" "$@" "${INPUT[@]}" | grep -A1 '^stream' | cut -c1-250; }
 run() { sleep "$PAUSE"; bin/matcher run "${C[@]}" -corpus "$CORPUS" -metrics "$M" "$@" | tail -1; }
 
 if [ "${MAIN_LABEL}" != go ] && [ ! -f results/backends.json ]; then
@@ -119,12 +128,18 @@ for _ in $(seq "$REPEATS"); do
   for w in $WORKERS; do stream -parser "$PARSER" -workers "$w" -label "stream-$PARSER" -out results/out.jsonl; done
 done
 if [ "$PARSER" != jx ]; then
-  echo "== 1. end-to-end streaming: parser A/B, same matcher, $NCPU workers (alternating)"
+  echo "== 1. end-to-end streaming: parser A/B, same matcher, alternating, 1 and $NCPU workers"
   for _ in $(seq "$REPEATS"); do
-    stream -parser jx -workers "$NCPU" -label stream-jx -out results/out.jsonl
-    stream -parser "$PARSER" -workers "$NCPU" -label "stream-$PARSER" -out results/out.jsonl
+    for w in 1 "$NCPU"; do
+      stream -parser jx -workers "$w" -label stream-jx -out results/out.jsonl
+      stream -parser "$PARSER" -workers "$w" -label "stream-$PARSER" -out results/out.jsonl
+    done
   done
 fi
+echo "== 1. end-to-end streaming: reading and element boundaries alone (-split-only)"
+for _ in $(seq "$REPEATS"); do
+  sleep "$PAUSE"; bin/matcher stream "${C[@]}" -split-only -workers "$NCPU" "${INPUT[@]}" | grep '^split-only'
+done
 
 echo "== 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)"
 FULL=-full; [ -n "${QUICK:-}" ] && FULL=""

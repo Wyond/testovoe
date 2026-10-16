@@ -1,0 +1,29 @@
+build tags: [re2_cgo rure pcre2 simdjson]; matcher: hybrid+pcre2 -backends results/backends.json -excluded pcre2; JSON parser: simdjson
+== tests
+go     ok  	waap-matcher/internal/matcher	1.515s
+re2    ok  	waap-matcher/internal/matcher	(cached)
+rure   ok  	waap-matcher/internal/matcher	(cached)
+pcre2  ok  	waap-matcher/internal/matcher	1.285s
+== 1. end-to-end streaming: correctness
+OK   jx: 1114166 requests, normalized bytes identical to data/corpus
+OK   simdjson: 1114166 requests, normalized bytes identical to data/corpus
+OK   stream (simdjson, 1 workers): output identical to the matcher-only run, 1114166 lines
+OK   stream (simdjson, 10 workers): output identical to the matcher-only run, 1114166 lines
+== 1. end-to-end streaming: scaling (simdjson, hybrid+pcre2), results written to results/out.jsonl
+stream simdjson workers=1    1114166 req    17.236s      64642 req/s      426 MB/s JSON   13.65 regex calls/req  alloc 7002 MB (0.0 allocs/req)  GC 22  peak RSS 1.65 GB  fallbacks 0  read 2.23s (stalled 14.91s), split 1.63s, queue
+stream simdjson workers=2    1114166 req     9.300s     119798 req/s      789 MB/s JSON   13.65 regex calls/req  alloc 7237 MB (0.0 allocs/req)  GC 18  peak RSS 1.65 GB  fallbacks 0  read 2.33s (stalled 6.89s), split 1.75s, queue 
+stream simdjson workers=4    1114166 req     5.420s     205575 req/s     1354 MB/s JSON   13.65 regex calls/req  alloc 7347 MB (0.0 allocs/req)  GC 14  peak RSS 1.97 GB  fallbacks 0  read 2.56s (stalled 2.73s), split 1.89s, queue 
+stream simdjson workers=8    1114166 req     4.701s     237029 req/s     1561 MB/s JSON   13.65 regex calls/req  alloc 7520 MB (0.0 allocs/req)  GC 13  peak RSS 2.23 GB  fallbacks 0  read 2.64s (stalled 1.96s), split 2.16s, queue 
+stream simdjson workers=10   1114166 req     4.009s     277942 req/s     1831 MB/s JSON   13.65 regex calls/req  alloc 7574 MB (0.0 allocs/req)  GC 15  peak RSS 1.80 GB  fallbacks 0  read 2.40s (stalled 1.54s), split 1.89s, queue 
+stream simdjson workers=1    1114166 req    16.202s      68768 req/s      453 MB/s JSON   13.65 regex calls/req  alloc 7066 MB (0.0 allocs/req)  GC 22  peak RSS 1.44 GB  fallbacks 0  read 2.20s (stalled 13.92s), split 1.49s, queue
+stream simdjson workers=2    1114166 req     8.650s     128807 req/s      848 MB/s JSON   13.65 regex calls/req  alloc 7191 MB (0.0 allocs/req)  GC 18  peak RSS 1.75 GB  fallbacks 0  read 2.18s (stalled 6.39s), split 1.61s, queue 
+stream simdjson workers=4    1114166 req     5.715s     194948 req/s     1284 MB/s JSON   13.65 regex calls/req  alloc 7453 MB (0.0 allocs/req)  GC 16  peak RSS 1.84 GB  fallbacks 0  read 2.60s (stalled 3.03s), split 1.96s, queue 
+stream simdjson workers=8    1114166 req     4.130s     269790 req/s     1777 MB/s JSON   13.65 regex calls/req  alloc 7565 MB (0.0 allocs/req)  GC 15  peak RSS 1.90 GB  fallbacks 0  read 2.46s (stalled 1.61s), split 1.85s, queue 
+stream simdjson workers=10   1114166 req     3.519s     316644 req/s     2086 MB/s JSON   13.65 regex calls/req  alloc 7302 MB (0.0 allocs/req)  GC 14  peak RSS 2.20 GB  fallbacks 0  read 2.31s (stalled 1.16s), split 1.63s, queue 
+stream simdjson workers=1    1114166 req    16.917s      65859 req/s      434 MB/s JSON   13.65 regex calls/req  alloc 7011 MB (0.0 allocs/req)  GC 22  peak RSS 1.44 GB  fallbacks 0  read 2.48s (stalled 14.37s), split 1.59s, queue
+stream simdjson workers=2    1114166 req     8.767s     127087 req/s      837 MB/s JSON   13.65 regex calls/req  alloc 7206 MB (0.0 allocs/req)  GC 19  peak RSS 1.64 GB  fallbacks 0  read 2.20s (stalled 6.50s), split 1.67s, queue 
+stream simdjson workers=4    1114166 req     5.270s     211406 req/s     1393 MB/s JSON   13.65 regex calls/req  alloc 7405 MB (0.0 allocs/req)  GC 16  peak RSS 1.76 GB  fallbacks 0  read 2.48s (stalled 2.71s), split 1.83s, queue 
+stream simdjson workers=8    1114166 req     3.621s     307706 req/s     2027 MB/s JSON   13.65 regex calls/req  alloc 7730 MB (0.0 allocs/req)  GC 16  peak RSS 1.92 GB  fallbacks 0  read 2.34s (stalled 1.23s), split 1.66s, queue 
+stream simdjson workers=10   1114166 req     4.164s     267576 req/s     1763 MB/s JSON   13.65 regex calls/req  alloc 7460 MB (0.0 allocs/req)  GC 14  peak RSS 1.81 GB  fallbacks 0  read 2.43s (stalled 1.66s), split 1.97s, queue 
+FAIL stream (simdjson, 10 workers): output differs from the matcher-only run
+      495.87 real       322.15 user        43.78 sys
