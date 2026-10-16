@@ -3,6 +3,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -22,7 +23,7 @@ import (
 func main() {
 	log.SetFlags(0)
 	if len(os.Args) < 2 {
-		log.Fatal("usage: matcher prepare|run|check|calibrate|stats|summary [flags]")
+		log.Fatal("usage: matcher stream|check-stream|prepare|run|check|calibrate|stats|summary [flags]")
 	}
 	switch cmd, args := os.Args[1], os.Args[2:]; cmd {
 	case "prepare":
@@ -33,6 +34,10 @@ func main() {
 		check(args)
 	case "summary":
 		summary(args)
+	case "stream":
+		stream(args)
+	case "check-stream":
+		checkStream(args)
 	case "calibrate":
 		calibrate(args)
 	case "stats":
@@ -85,7 +90,24 @@ func commonFlags(fs *flag.FlagSet) common {
 	}
 }
 
+// rules loads and compiles the rules with the engine flags and prints the reports.
+func (c common) rules() *matcher.Matcher {
+	m, _ := c.load()
+	return m
+}
+
 func (c common) open() (*matcher.Matcher, *matcher.Store, float64) {
+	m, init := c.load()
+	s, err := matcher.OpenStore(*c.corpus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	fmt.Printf("corpus: %d requests, %.0f MB normalized; rule initialization %.2fs\n",
+		s.Count(), float64(s.Manifest.PayloadBytes)/1e6, init)
+	return m, s, init
+}
+
+func (c common) load() (*matcher.Matcher, float64) {
 	t := time.Now()
 	opt := matcher.Options{Engine: *c.engine, Excluded: *c.excluded}
 	if *c.backends != "" {
@@ -113,13 +135,7 @@ func (c common) open() (*matcher.Matcher, *matcher.Store, float64) {
 	m := matcher.NewMatcher(rules)
 	init := time.Since(t).Seconds()
 	fmt.Print(rules.Report(), m.Filter.Report())
-	s, err := matcher.OpenStore(*c.corpus)
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Printf("corpus: %d requests, %.0f MB normalized; rule initialization %.2fs\n",
-		s.Count(), float64(s.Manifest.PayloadBytes)/1e6, init)
-	return m, s, init
+	return m, init
 }
 
 func line(r *matcher.Result) string {
@@ -366,4 +382,129 @@ func calibrate(args []string) {
 	if err := os.WriteFile(*out, b, 0o644); err != nil {
 		log.Fatal(err)
 	}
+}
+
+// stream is the end-to-end mode: the JSON files are read and parsed on every run.
+func stream(args []string) {
+	fs := flag.NewFlagSet("stream", flag.ExitOnError)
+	c := commonFlags(fs)
+	parser := fs.String("parser", "jx", "JSON parser: "+strings.Join(matcher.ParserNames(), ", "))
+	mode := fs.String("mode", "fast", "naive or fast")
+	workers := fs.Int("workers", runtime.NumCPU(), "worker goroutines (also GOMAXPROCS)")
+	chunk := fs.Int("chunk", 1<<20, "bytes read per chunk")
+	queueMB := fs.Int64("queue-mb", 256, "JSON megabytes queued or in progress (backpressure above)")
+	outPath := fs.String("out", "results/out.jsonl", "result file; empty = format but do not write")
+	metrics := fs.String("metrics", "", "append the run's metrics as one JSON line to this file")
+	label := fs.String("label", "", "free-form label stored with the metrics")
+	cpuProf := fs.String("cpuprofile", "", "write a CPU profile")
+	memProf := fs.String("memprofile", "", "write an allocation profile (every allocation sampled)")
+	fs.Parse(args)
+	if fs.NArg() == 0 {
+		log.Fatal("usage: matcher stream [flags] <json dir>...")
+	}
+	paths, err := matcher.InputFiles(fs.Args())
+	if err != nil {
+		log.Fatal(err)
+	}
+	t := time.Now()
+	m := c.rules()
+	initSec := time.Since(t).Seconds()
+	fmt.Printf("parser %s: %s; %d files; rule initialization %.2fs\n", *parser, matcher.ParserBackend(*parser), len(paths), initSec)
+	cfg := matcher.StreamConfig{Mode: *mode, Parser: *parser, Workers: *workers, ChunkSize: *chunk, QueueBytes: *queueMB << 20}
+	var outF *os.File
+	if *outPath != "" {
+		if outF, err = os.Create(*outPath); err != nil {
+			log.Fatal(err)
+		}
+		cfg.Out = outF
+	}
+	if *memProf != "" {
+		runtime.MemProfileRate = 1
+	}
+	if *cpuProf != "" {
+		f, err := os.Create(*cpuProf)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.StartCPUProfile(f)
+	}
+	r, err := matcher.RunStream(m, paths, cfg)
+	pprof.StopCPUProfile()
+	if err != nil {
+		log.Fatal(err)
+	}
+	if outF != nil {
+		if err := outF.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}
+	if *memProf != "" {
+		f, err := os.Create(*memProf)
+		if err != nil {
+			log.Fatal(err)
+		}
+		pprof.Lookup("allocs").WriteTo(f, 0)
+		f.Close()
+	}
+	var ru syscall.Rusage
+	syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
+	fmt.Printf("stream %-8s workers=%-2d %9d req  %8.3fs  %9.0f req/s  %7.0f MB/s JSON  %6.2f regex calls/req  alloc %.0f MB (%.1f allocs/req)  GC %d  peak RSS %.2f GB  fallbacks %d  read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs; workers idle %.2fs total\n",
+		*parser, *workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.RegexCalls, float64(r.AllocBytes)/1e6,
+		float64(r.Allocs)/float64(max(r.Requests, 1)), r.NumGC, float64(ru.Maxrss)/(1<<30), r.Fallbacks,
+		r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec, r.WorkerIdleSec)
+	if *metrics != "" {
+		rec := struct {
+			*matcher.StreamResult
+			Label   string  `json:"label,omitempty"`
+			InitSec float64 `json:"rule_init_seconds"`
+			MaxRSS  int64   `json:"max_rss_raw"`
+			GoVer   string  `json:"go"`
+			Time    string  `json:"time"`
+		}{r, *label, initSec, ru.Maxrss, runtime.Version(), time.Now().Format(time.RFC3339)}
+		f, err := os.OpenFile(*metrics, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+		if err != nil {
+			log.Fatal(err)
+		}
+		json.NewEncoder(f).Encode(rec)
+		if err := f.Close(); err != nil {
+			log.Fatal(err)
+		}
+	}
+}
+
+// checkStream compares the normalized bytes a parser produces, request by request, with
+// a prepared corpus.
+func checkStream(args []string) {
+	fs := flag.NewFlagSet("check-stream", flag.ExitOnError)
+	corpus := fs.String("corpus", "data/corpus", "prepared corpus to compare with")
+	parser := fs.String("parser", "jx", "JSON parser")
+	fs.Parse(args)
+	paths, err := matcher.InputFiles(fs.Args())
+	if err != nil {
+		log.Fatal(err)
+	}
+	s, err := matcher.OpenStore(*corpus)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer s.Close()
+	var n, bad int64
+	err = matcher.StreamNormalized(paths, *parser, func(id int64, norm []byte) error {
+		if int(id) >= s.Count() || !bytes.Equal(norm, s.Request(int(id))) {
+			if bad++; bad <= 5 {
+				fmt.Printf("  differs: request %d\n", id)
+			}
+		}
+		n++
+		return nil
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+	if bad == 0 && n == int64(s.Count()) {
+		fmt.Printf("OK   %s: %d requests, normalized bytes identical to %s\n", *parser, n, *corpus)
+		return
+	}
+	fmt.Printf("FAIL %s: %d requests (corpus has %d), %d differ\n", *parser, n, s.Count(), bad)
+	os.Exit(1)
 }

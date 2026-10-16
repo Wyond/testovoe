@@ -211,46 +211,58 @@ func normalizeFileJx(path string, wholeFile bool) (buf []byte, ends []int, err e
 		buf = make([]byte, 0, st.Size())
 		d = jx.Decode(f, 1<<20)
 	}
-	var method, url, hdr, body []byte
-	scalar := func(d *jx.Decoder, dst []byte) ([]byte, error) {
-		switch d.Next() {
-		case jx.String:
-			return d.StrAppend(dst)
-		case jx.Number:
-			n, err := d.Num()
-			return append(dst, n...), err
-		case jx.Bool:
-			v, err := d.Bool()
-			return strconv.AppendBool(dst, v), err
-		case jx.Null:
-			return dst, d.Null()
-		default: // nested value where a scalar was expected: skip, treat as empty
-			return dst, d.Skip()
-		}
+	obj := newJxObject()
+	if d.Next() != jx.Array {
+		return nil, nil, errors.New("expected a JSON array")
 	}
-	header := func(d *jx.Decoder, name []byte) error {
-		hdr = append(hdr, name...)
-		hdr = append(hdr, ": "...)
+	err = d.Arr(func(d *jx.Decoder) error {
+		if d.Next() != jx.Object {
+			return errors.New("expected an object")
+		}
 		var err error
-		if hdr, err = scalar(d, hdr); err != nil {
+		if buf, err = obj.decode(d, buf); err != nil {
 			return err
 		}
-		hdr = append(hdr, "\r\n"...)
+		ends = append(ends, len(buf))
+		return nil
+	})
+	return buf, ends, err
+}
+
+// jxObject turns one {method,url,headers,data} object into a normalized request. Its
+// four field buffers and the callbacks are allocated once and reused for every object.
+// Scalars are written the way normalizeFileStd writes them: numbers as their JSON text,
+// booleans as true/false, null and nested values as empty.
+type jxObject struct {
+	method, url, hdr, body []byte
+	header, field          func(*jx.Decoder, []byte) error
+}
+
+func newJxObject() *jxObject {
+	o := &jxObject{}
+	o.header = func(d *jx.Decoder, name []byte) error {
+		o.hdr = append(o.hdr, name...)
+		o.hdr = append(o.hdr, ": "...)
+		var err error
+		if o.hdr, err = jxScalar(d, o.hdr); err != nil {
+			return err
+		}
+		o.hdr = append(o.hdr, "\r\n"...)
 		return nil
 	}
-	field := func(d *jx.Decoder, key []byte) error {
+	o.field = func(d *jx.Decoder, key []byte) error {
 		var err error
 		switch string(key) { // no allocation: the compiler compares bytes in place
 		case "method":
-			method, err = scalar(d, method[:0])
+			o.method, err = jxScalar(d, o.method[:0])
 		case "url":
-			url, err = scalar(d, url[:0])
+			o.url, err = jxScalar(d, o.url[:0])
 		case "data":
-			body, err = scalar(d, body[:0])
+			o.body, err = jxScalar(d, o.body[:0])
 		case "headers":
 			switch t := d.Next(); t {
 			case jx.Object:
-				err = d.ObjBytes(header)
+				err = d.ObjBytes(o.header)
 			case jx.Null:
 				err = d.Null()
 			default:
@@ -261,22 +273,33 @@ func normalizeFileJx(path string, wholeFile bool) (buf []byte, ends []int, err e
 		}
 		return err
 	}
-	if d.Next() != jx.Array {
-		return nil, nil, errors.New("expected a JSON array")
+	return o
+}
+
+// decode reads the object d is positioned at and appends the normalized request to dst.
+func (o *jxObject) decode(d *jx.Decoder, dst []byte) ([]byte, error) {
+	o.method, o.url, o.hdr, o.body = o.method[:0], o.url[:0], o.hdr[:0], o.body[:0]
+	if err := d.ObjBytes(o.field); err != nil {
+		return dst, err
 	}
-	err = d.Arr(func(d *jx.Decoder) error {
-		if d.Next() != jx.Object {
-			return errors.New("expected an object")
-		}
-		method, url, hdr, body = method[:0], url[:0], hdr[:0], body[:0]
-		if err := d.ObjBytes(field); err != nil {
-			return err
-		}
-		buf = appendRequest(buf, method, url, hdr, body)
-		ends = append(ends, len(buf))
-		return nil
-	})
-	return buf, ends, err
+	return appendRequest(dst, o.method, o.url, o.hdr, o.body), nil
+}
+
+func jxScalar(d *jx.Decoder, dst []byte) ([]byte, error) {
+	switch d.Next() {
+	case jx.String:
+		return d.StrAppend(dst)
+	case jx.Number:
+		n, err := d.Num()
+		return append(dst, n...), err
+	case jx.Bool:
+		v, err := d.Bool()
+		return strconv.AppendBool(dst, v), err
+	case jx.Null:
+		return dst, d.Null()
+	default: // nested value where a scalar was expected: skip, treat as empty
+		return dst, d.Skip()
+	}
 }
 
 // Decoders available to Convert.
@@ -284,6 +307,30 @@ var decoders = map[string]func(string) ([]byte, []int, error){
 	"std":     normalizeFileStd,
 	"jx":      func(p string) ([]byte, []int, error) { return normalizeFileJx(p, false) },
 	"jxbytes": func(p string) ([]byte, []int, error) { return normalizeFileJx(p, true) },
+}
+
+// InputFiles lists every *.json under dirs: dirs in the given order, files inside a dir
+// by lexical path. Request ids follow this order in both Convert and RunStream.
+func InputFiles(dirs []string) ([]string, error) {
+	var paths []string
+	for _, d := range dirs {
+		var fs []string
+		err := filepath.WalkDir(d, func(p string, e os.DirEntry, err error) error {
+			if err == nil && !e.IsDir() && strings.HasSuffix(p, ".json") && !strings.HasPrefix(e.Name(), "._") {
+				fs = append(fs, p)
+			}
+			return err
+		})
+		if err != nil {
+			return nil, err
+		}
+		if len(fs) == 0 {
+			return nil, fmt.Errorf("no *.json under %s", d)
+		}
+		sort.Strings(fs)
+		paths = append(paths, fs...)
+	}
+	return paths, nil
 }
 
 // Convert normalizes every *.json under dirs (dirs in the given order, files inside a dir
@@ -303,23 +350,9 @@ func Convert(dirs []string, outDir string, workers int, decoder string, inflight
 	runtime.ReadMemStats(&ms0)
 	start := time.Now()
 	m := &Manifest{FormatVersion: FormatVersion, NormVersion: NormVersion, Normalization: normDescription, Workers: workers, Decoder: decoder, InflightMB: inflightBytes >> 20}
-	var paths []string
-	for _, d := range dirs {
-		var fs []string
-		err := filepath.WalkDir(d, func(p string, e os.DirEntry, err error) error {
-			if err == nil && !e.IsDir() && strings.HasSuffix(p, ".json") && !strings.HasPrefix(e.Name(), "._") {
-				fs = append(fs, p)
-			}
-			return err
-		})
-		if err != nil {
-			return nil, err
-		}
-		if len(fs) == 0 {
-			return nil, fmt.Errorf("no *.json under %s", d)
-		}
-		sort.Strings(fs)
-		paths = append(paths, fs...)
+	paths, err := InputFiles(dirs)
+	if err != nil {
+		return nil, err
 	}
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return nil, err

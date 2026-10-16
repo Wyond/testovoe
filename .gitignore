@@ -1,8 +1,9 @@
+*.test
+.omc/
 bin/
 data/
 results/*.jsonl
 results/*.prof
-*.test
+results/cache/
 results/decoders.log
-.omc/
 third_party/
