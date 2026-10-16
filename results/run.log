@@ -1,106 +1,148 @@
-build tags: [re2_cgo rure pcre2 simdjson]; matcher: hybrid+pcre2 -backends results/backends.json -excluded pcre2; JSON parser: simdjson
+build tags: [re2_cgo rure pcre2 simdjson]; matcher: hybrid+pcre2 -backends config/backends.json -excluded pcre2; JSON parser: simdjson
 == tests
-go     ok  	waap-matcher/internal/matcher	2.192s
-re2    ok  	waap-matcher/internal/matcher	1.725s
-rure   ok  	waap-matcher/internal/matcher	1.915s
-pcre2  ok  	waap-matcher/internal/matcher	1.555s
+go     ok  	waap-matcher/internal/matcher	1.968s
+re2    ok  	waap-matcher/internal/matcher	1.178s
+rure   ok  	waap-matcher/internal/matcher	1.486s
+pcre2  ok  	waap-matcher/internal/matcher	1.499s
 == 1. end-to-end streaming: correctness
 OK   jx: 1114166 requests, normalized bytes identical to data/corpus
 OK   simdjson: 1114166 requests, normalized bytes identical to data/corpus
-OK   stream (simdjson, 1 workers): output identical to the matcher-only run, 1114166 lines
-OK   stream (simdjson, 10 workers): output identical to the matcher-only run, 1114166 lines
+OK   stream (simdjson, 1 workers, 1 readers): output identical to the matcher-only run, 1114166 lines
+OK   stream (simdjson, 10 workers, 1 readers): output identical to the matcher-only run, 1114166 lines
+OK   stream (simdjson, 10 workers, 4 readers): output identical to the matcher-only run, 1114166 lines
 == 1. end-to-end streaming: scaling (simdjson, hybrid+pcre2), results written to results/out.jsonl
-stream simdjson workers=1    1114166 req    17.190s      64813 req/s      427 MB/s JSON   13.65 regex calls/req  Go alloc 7135 MB (0.02 allocs/req)  GC 21  peak RSS 1.69 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 2.53s (stalled 14.56s), split 1.63s, queue full 11.99s; workers idle 1.59s total
-stream simdjson workers=2    1114166 req     9.363s     118992 req/s      784 MB/s JSON   13.65 regex calls/req  Go alloc 7506 MB (0.02 allocs/req)  GC 17  peak RSS 1.71 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 208 (1168 MB, not in Go alloc); read 2.33s (stalled 6.95s), split 1.77s, queue full 4.68s; workers idle 3.91s total
-stream simdjson workers=4    1114166 req     4.828s     230772 req/s     1520 MB/s JSON   13.65 regex calls/req  Go alloc 7410 MB (0.02 allocs/req)  GC 15  peak RSS 2.00 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 258 (1173 MB, not in Go alloc); read 2.52s (stalled 2.22s), split 1.76s, queue full 1.31s; workers idle 4.79s total
-stream simdjson workers=8    1114166 req     4.289s     259796 req/s     1711 MB/s JSON   13.65 regex calls/req  Go alloc 7336 MB (0.02 allocs/req)  GC 14  peak RSS 2.01 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 434 (1182 MB, not in Go alloc); read 2.46s (stalled 1.75s), split 2.02s, queue full 0.74s; workers idle 14.30s total
-stream simdjson workers=10   1114166 req     4.240s     262751 req/s     1731 MB/s JSON   13.65 regex calls/req  Go alloc 7439 MB (0.02 allocs/req)  GC 15  peak RSS 1.85 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 456 (1184 MB, not in Go alloc); read 2.44s (stalled 1.71s), split 1.93s, queue full 0.64s; workers idle 21.31s total
-stream simdjson workers=1    1114166 req    16.753s      66504 req/s      438 MB/s JSON   13.65 regex calls/req  Go alloc 7060 MB (0.02 allocs/req)  GC 23  peak RSS 1.44 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 2.32s (stalled 14.33s), split 1.59s, queue full 11.75s; workers idle 1.61s total
-stream simdjson workers=2    1114166 req     8.636s     129007 req/s      850 MB/s JSON   13.65 regex calls/req  Go alloc 7261 MB (0.02 allocs/req)  GC 19  peak RSS 1.65 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 204 (1168 MB, not in Go alloc); read 2.28s (stalled 6.28s), split 1.61s, queue full 4.39s; workers idle 3.76s total
-stream simdjson workers=4    1114166 req     5.639s     197581 req/s     1301 MB/s JSON   13.65 regex calls/req  Go alloc 7176 MB (0.02 allocs/req)  GC 14  peak RSS 1.96 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 269 (1173 MB, not in Go alloc); read 2.67s (stalled 2.88s), split 1.96s, queue full 1.76s; workers idle 5.41s total
-stream simdjson workers=8    1114166 req     4.238s     262922 req/s     1732 MB/s JSON   13.65 regex calls/req  Go alloc 7402 MB (0.02 allocs/req)  GC 13  peak RSS 1.97 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 409 (1181 MB, not in Go alloc); read 2.51s (stalled 1.66s), split 1.95s, queue full 0.64s; workers idle 14.13s total
-stream simdjson workers=10   1114166 req     4.216s     264260 req/s     1741 MB/s JSON   13.65 regex calls/req  Go alloc 7624 MB (0.02 allocs/req)  GC 14  peak RSS 2.06 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 461 (1186 MB, not in Go alloc); read 2.43s (stalled 1.69s), split 2.02s, queue full 0.76s; workers idle 20.90s total
-stream simdjson workers=1    1114166 req    17.158s      64935 req/s      428 MB/s JSON   13.65 regex calls/req  Go alloc 7037 MB (0.02 allocs/req)  GC 21  peak RSS 1.45 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 2.23s (stalled 14.84s), split 1.60s, queue full 12.16s; workers idle 1.56s total
-stream simdjson workers=2    1114166 req     9.075s     122777 req/s      809 MB/s JSON   13.65 regex calls/req  Go alloc 7239 MB (0.02 allocs/req)  GC 20  peak RSS 1.67 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 205 (1167 MB, not in Go alloc); read 2.45s (stalled 6.55s), split 1.70s, queue full 4.53s; workers idle 3.74s total
-stream simdjson workers=4    1114166 req     5.157s     216069 req/s     1423 MB/s JSON   13.65 regex calls/req  Go alloc 7476 MB (0.02 allocs/req)  GC 15  peak RSS 2.05 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 265 (1173 MB, not in Go alloc); read 2.52s (stalled 2.53s), split 1.81s, queue full 1.51s; workers idle 4.88s total
-stream simdjson workers=8    1114166 req     4.307s     258672 req/s     1704 MB/s JSON   13.65 regex calls/req  Go alloc 7598 MB (0.02 allocs/req)  GC 16  peak RSS 1.92 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 390 (1181 MB, not in Go alloc); read 2.50s (stalled 1.72s), split 1.93s, queue full 0.73s; workers idle 14.19s total
-stream simdjson workers=10   1114166 req     4.096s     272025 req/s     1792 MB/s JSON   13.65 regex calls/req  Go alloc 7859 MB (0.02 allocs/req)  GC 14  peak RSS 1.96 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 470 (1184 MB, not in Go alloc); read 2.49s (stalled 1.52s), split 1.92s, queue full 0.59s; workers idle 20.74s total
+stream simdjson readers=4 workers=1    1114166 req    21.564s      51669 req/s      340 MB/s JSON   13.65 regex calls/req  Go alloc 9154 MB (0.03 allocs/req)  GC 35  peak RSS 1.76 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 281 (1164 MB, not in Go alloc); read 7.20s (stalled 35.19s), split 3.74s, queue full 65.05s; workers idle 2.13s total
+stream simdjson readers=4 workers=2    1114166 req     8.611s     129382 req/s      852 MB/s JSON   13.65 regex calls/req  Go alloc 9246 MB (0.03 allocs/req)  GC 31  peak RSS 1.88 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 313 (1167 MB, not in Go alloc); read 3.52s (stalled 13.51s), split 1.78s, queue full 23.92s; workers idle 1.80s total
+stream simdjson readers=4 workers=4    1114166 req     4.596s     242444 req/s     1597 MB/s JSON   13.65 regex calls/req  Go alloc 9203 MB (0.03 allocs/req)  GC 23  peak RSS 1.92 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 315 (1173 MB, not in Go alloc); read 4.43s (stalled 4.37s), split 1.98s, queue full 8.66s; workers idle 3.38s total
+stream simdjson readers=4 workers=8    1114166 req     3.346s     332981 req/s     2193 MB/s JSON   13.65 regex calls/req  Go alloc 9472 MB (0.03 allocs/req)  GC 21  peak RSS 2.28 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 376 (1179 MB, not in Go alloc); read 5.75s (stalled 1.26s), split 2.11s, queue full 2.47s; workers idle 7.64s total
+stream simdjson readers=4 workers=10   1114166 req     3.057s     364447 req/s     2401 MB/s JSON   13.65 regex calls/req  Go alloc 9425 MB (0.03 allocs/req)  GC 19  peak RSS 2.32 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 458 (1190 MB, not in Go alloc); read 4.19s (stalled 1.77s), split 2.11s, queue full 2.11s; workers idle 10.09s total
+stream simdjson readers=4 workers=1    1114166 req    13.760s      80970 req/s      533 MB/s JSON   13.65 regex calls/req  Go alloc 9074 MB (0.03 allocs/req)  GC 34  peak RSS 1.76 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 352 (1164 MB, not in Go alloc); read 1.32s (stalled 25.47s), split 1.71s, queue full 43.55s; workers idle 1.10s total
+stream simdjson readers=4 workers=2    1114166 req     6.974s     159750 req/s     1052 MB/s JSON   13.65 regex calls/req  Go alloc 9116 MB (0.03 allocs/req)  GC 31  peak RSS 1.80 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 279 (1167 MB, not in Go alloc); read 0.93s (stalled 12.64s), split 1.45s, queue full 20.98s; workers idle 1.06s total
+stream simdjson readers=4 workers=4    1114166 req     4.017s     277396 req/s     1827 MB/s JSON   13.65 regex calls/req  Go alloc 9290 MB (0.03 allocs/req)  GC 24  peak RSS 2.04 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 304 (1171 MB, not in Go alloc); read 2.56s (stalled 4.98s), split 1.81s, queue full 8.25s; workers idle 2.54s total
+stream simdjson readers=4 workers=8    1114166 req     3.300s     337577 req/s     2224 MB/s JSON   13.65 regex calls/req  Go alloc 9336 MB (0.03 allocs/req)  GC 19  peak RSS 2.55 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 362 (1179 MB, not in Go alloc); read 4.89s (stalled 1.81s), split 2.10s, queue full 2.99s; workers idle 7.13s total
+stream simdjson readers=4 workers=10   1114166 req     3.028s     367971 req/s     2424 MB/s JSON   13.65 regex calls/req  Go alloc 9466 MB (0.03 allocs/req)  GC 17  peak RSS 2.31 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 482 (1183 MB, not in Go alloc); read 3.91s (stalled 1.89s), split 2.17s, queue full 2.50s; workers idle 9.20s total
+stream simdjson readers=4 workers=1    1114166 req    13.679s      81448 req/s      536 MB/s JSON   13.65 regex calls/req  Go alloc 9116 MB (0.03 allocs/req)  GC 34  peak RSS 1.86 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 198 (1164 MB, not in Go alloc); read 1.78s (stalled 23.96s), split 1.83s, queue full 40.59s; workers idle 0.94s total
+stream simdjson readers=4 workers=2    1114166 req     7.019s     158726 req/s     1046 MB/s JSON   13.65 regex calls/req  Go alloc 9212 MB (0.03 allocs/req)  GC 29  peak RSS 1.82 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 244 (1167 MB, not in Go alloc); read 1.03s (stalled 11.72s), split 1.54s, queue full 19.82s; workers idle 1.23s total
+stream simdjson readers=4 workers=4    1114166 req     3.930s     283509 req/s     1867 MB/s JSON   13.65 regex calls/req  Go alloc 9245 MB (0.03 allocs/req)  GC 25  peak RSS 2.00 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 289 (1172 MB, not in Go alloc); read 1.52s (stalled 5.07s), split 1.74s, queue full 8.33s; workers idle 2.79s total
+stream simdjson readers=4 workers=8    1114166 req     3.153s     353390 req/s     2328 MB/s JSON   13.65 regex calls/req  Go alloc 9433 MB (0.03 allocs/req)  GC 19  peak RSS 2.52 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 374 (1181 MB, not in Go alloc); read 3.94s (stalled 2.12s), split 2.07s, queue full 3.25s; workers idle 6.87s total
+stream simdjson readers=4 workers=10   1114166 req     2.939s     379110 req/s     2497 MB/s JSON   13.65 regex calls/req  Go alloc 9310 MB (0.03 allocs/req)  GC 17  peak RSS 2.34 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 442 (1183 MB, not in Go alloc); read 3.00s (stalled 2.35s), split 2.14s, queue full 2.67s; workers idle 9.29s total
 == 1. end-to-end streaming: parser A/B, same matcher, alternating, 1 and 10 workers
-stream jx       workers=1    1114166 req    20.788s      53597 req/s      353 MB/s JSON   13.65 regex calls/req  Go alloc 9479 MB (0.02 allocs/req)  GC 27  peak RSS 1.96 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.19s (stalled 18.52s), split 1.45s, queue full 15.65s; workers idle 1.48s total
-stream simdjson workers=1    1114166 req    14.725s      75665 req/s      498 MB/s JSON   13.65 regex calls/req  Go alloc 7160 MB (0.02 allocs/req)  GC 24  peak RSS 1.44 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 2.15s (stalled 12.51s), split 1.39s, queue full 10.16s; workers idle 1.45s total
-stream jx       workers=10   1114166 req     5.108s     218116 req/s     1437 MB/s JSON   13.65 regex calls/req  Go alloc 10353 MB (0.02 allocs/req)  GC 15  peak RSS 2.20 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.44s (stalled 2.63s), split 1.78s, queue full 1.50s; workers idle 24.08s total
-stream simdjson workers=10   1114166 req     3.672s     303444 req/s     1999 MB/s JSON   13.65 regex calls/req  Go alloc 7593 MB (0.02 allocs/req)  GC 15  peak RSS 1.94 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 468 (1185 MB, not in Go alloc); read 2.38s (stalled 1.24s), split 1.71s, queue full 0.54s; workers idle 18.78s total
-stream jx       workers=1    1114166 req    19.576s      56915 req/s      375 MB/s JSON   13.65 regex calls/req  Go alloc 9421 MB (0.02 allocs/req)  GC 26  peak RSS 2.01 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.11s (stalled 17.40s), split 1.45s, queue full 14.62s; workers idle 1.39s total
-stream simdjson workers=1    1114166 req    14.529s      76684 req/s      505 MB/s JSON   13.65 regex calls/req  Go alloc 7006 MB (0.02 allocs/req)  GC 23  peak RSS 1.43 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 1.97s (stalled 12.49s), split 1.35s, queue full 10.19s; workers idle 1.29s total
-stream jx       workers=10   1114166 req     5.010s     222399 req/s     1465 MB/s JSON   13.65 regex calls/req  Go alloc 9907 MB (0.02 allocs/req)  GC 15  peak RSS 2.12 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.51s (stalled 2.45s), split 1.76s, queue full 1.51s; workers idle 23.00s total
-stream simdjson workers=10   1114166 req     3.636s     306465 req/s     2019 MB/s JSON   13.65 regex calls/req  Go alloc 7327 MB (0.02 allocs/req)  GC 15  peak RSS 2.01 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 463 (1184 MB, not in Go alloc); read 2.35s (stalled 1.23s), split 1.68s, queue full 0.58s; workers idle 18.51s total
-stream jx       workers=1    1114166 req    19.604s      56835 req/s      374 MB/s JSON   13.65 regex calls/req  Go alloc 9431 MB (0.02 allocs/req)  GC 31  peak RSS 1.85 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.12s (stalled 17.46s), split 1.40s, queue full 14.21s; workers idle 1.48s total
-stream simdjson workers=1    1114166 req    14.513s      76769 req/s      506 MB/s JSON   13.65 regex calls/req  Go alloc 7081 MB (0.02 allocs/req)  GC 22  peak RSS 1.45 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 172 (1164 MB, not in Go alloc); read 2.11s (stalled 12.35s), split 1.36s, queue full 10.02s; workers idle 1.30s total
-stream jx       workers=10   1114166 req     5.153s     216216 req/s     1424 MB/s JSON   13.65 regex calls/req  Go alloc 9960 MB (0.02 allocs/req)  GC 15  peak RSS 2.20 GB
-       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.53s (stalled 2.57s), split 1.78s, queue full 1.59s; workers idle 23.45s total
-stream simdjson workers=10   1114166 req     3.577s     311453 req/s     2052 MB/s JSON   13.65 regex calls/req  Go alloc 7586 MB (0.02 allocs/req)  GC 14  peak RSS 1.95 GB
-       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 458 (1189 MB, not in Go alloc); read 2.37s (stalled 1.17s), split 1.68s, queue full 0.54s; workers idle 17.80s total
+stream jx       readers=4 workers=1    1114166 req    18.540s      60094 req/s      396 MB/s JSON   13.65 regex calls/req  Go alloc 11495 MB (0.03 allocs/req)  GC 41  peak RSS 1.72 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 1.65s (stalled 34.38s), split 2.05s, queue full 57.11s; workers idle 1.14s total
+stream simdjson readers=4 workers=1    1114166 req    13.560s      82166 req/s      541 MB/s JSON   13.65 regex calls/req  Go alloc 9149 MB (0.03 allocs/req)  GC 32  peak RSS 1.73 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 201 (1164 MB, not in Go alloc); read 0.97s (stalled 24.19s), split 1.62s, queue full 40.79s; workers idle 1.12s total
+stream jx       readers=4 workers=10   1114166 req     4.591s     242688 req/s     1599 MB/s JSON   13.65 regex calls/req  Go alloc 11743 MB (0.03 allocs/req)  GC 21  peak RSS 2.22 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 4.75s (stalled 3.24s), split 2.07s, queue full 4.24s; workers idle 16.89s total
+stream simdjson readers=4 workers=10   1114166 req     2.966s     375685 req/s     2475 MB/s JSON   13.65 regex calls/req  Go alloc 9221 MB (0.03 allocs/req)  GC 19  peak RSS 2.40 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 455 (1184 MB, not in Go alloc); read 3.25s (stalled 2.23s), split 2.16s, queue full 2.58s; workers idle 9.19s total
+stream jx       readers=4 workers=1    1114166 req    18.507s      60203 req/s      397 MB/s JSON   13.65 regex calls/req  Go alloc 11439 MB (0.03 allocs/req)  GC 36  peak RSS 2.09 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 1.13s (stalled 34.21s), split 1.39s, queue full 58.70s; workers idle 1.11s total
+stream simdjson readers=4 workers=1    1114166 req    13.696s      81353 req/s      536 MB/s JSON   13.65 regex calls/req  Go alloc 9109 MB (0.03 allocs/req)  GC 34  peak RSS 1.75 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 198 (1164 MB, not in Go alloc); read 1.25s (stalled 24.19s), split 1.75s, queue full 41.84s; workers idle 1.27s total
+stream jx       readers=4 workers=10   1114166 req     4.554s     244667 req/s     1612 MB/s JSON   13.65 regex calls/req  Go alloc 11970 MB (0.03 allocs/req)  GC 20  peak RSS 2.27 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 4.94s (stalled 3.10s), split 2.09s, queue full 4.03s; workers idle 17.03s total
+stream simdjson readers=4 workers=10   1114166 req     2.981s     373772 req/s     2462 MB/s JSON   13.65 regex calls/req  Go alloc 9275 MB (0.03 allocs/req)  GC 18  peak RSS 2.58 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 443 (1181 MB, not in Go alloc); read 3.27s (stalled 2.21s), split 2.17s, queue full 2.70s; workers idle 9.12s total
+stream jx       readers=4 workers=1    1114166 req    18.480s      60289 req/s      397 MB/s JSON   13.65 regex calls/req  Go alloc 11507 MB (0.03 allocs/req)  GC 42  peak RSS 1.74 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 0.58s (stalled 34.92s), split 1.72s, queue full 58.05s; workers idle 1.22s total
+stream simdjson readers=4 workers=1    1114166 req    13.634s      81718 req/s      538 MB/s JSON   13.65 regex calls/req  Go alloc 9063 MB (0.03 allocs/req)  GC 33  peak RSS 1.76 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 274 (1164 MB, not in Go alloc); read 0.76s (stalled 25.18s), split 1.77s, queue full 43.75s; workers idle 0.98s total
+stream jx       readers=4 workers=10   1114166 req     4.541s     245370 req/s     1616 MB/s JSON   13.65 regex calls/req  Go alloc 11844 MB (0.04 allocs/req)  GC 20  peak RSS 2.21 GB
+       parsed by jx: 1114166, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 2.43s (stalled 4.30s), split 2.07s, queue full 5.60s; workers idle 16.47s total
+stream simdjson readers=4 workers=10   1114166 req     2.971s     374965 req/s     2470 MB/s JSON   13.65 regex calls/req  Go alloc 9218 MB (0.03 allocs/req)  GC 17  peak RSS 2.28 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 475 (1184 MB, not in Go alloc); read 2.42s (stalled 2.44s), split 2.17s, queue full 2.85s; workers idle 9.18s total
+== 1. end-to-end streaming: parallel file readers, simdjson, 10 workers
+stream simdjson readers=1 workers=10   1114166 req     3.145s     354244 req/s     2333 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=2 workers=10   1114166 req     3.061s     364001 req/s     2398 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=3 workers=10   1114166 req     3.013s     369819 req/s     2436 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=4 workers=10   1114166 req     3.010s     370130 req/s     2438 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=1 workers=10   1114166 req     3.167s     351857 req/s     2318 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=2 workers=10   1114166 req     3.074s     362430 req/s     2387 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=3 workers=10   1114166 req     3.018s     369136 req/s     2431 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=4 workers=10   1114166 req     2.958s     376607 req/s     2481 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=1 workers=10   1114166 req     3.305s     337091 req/s     2220 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=2 workers=10   1114166 req     2.930s     380273 req/s     2505 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=3 workers=10   1114166 req     2.930s     380304 req/s     2505 MB/s JSON   13.65 regex calls/re
+stream simdjson readers=4 workers=10   1114166 req     2.990s     372575 req/s     2454 MB/s JSON   13.65 regex calls/re
 == 1. end-to-end streaming: reading and element boundaries alone (-split-only)
-split-only workers=10   1114166 messages     2.742s     406398 msg/s     2677 MB/s JSON  read 2.28s (stalled 0.44s), split 1.43s, queue full 0.01s
-split-only workers=10   1114166 messages     2.753s     404685 msg/s     2666 MB/s JSON  read 2.31s (stalled 0.42s), split 1.42s, queue full 0.01s
-split-only workers=10   1114166 messages     2.763s     403217 msg/s     2656 MB/s JSON  read 2.30s (stalled 0.45s), split 1.44s, queue full 0.01s
+split-only readers=1 workers=10   1114166 messages     1.835s     607199 msg/s     4000 MB/s JSON  read 0.54s (stalled 0.58s), split 1.32s, queue full 0.01s
+split-only readers=4 workers=10   1114166 messages     0.947s    1176328 msg/s     7748 MB/s JSON  read 1.09s (stalled 0.62s), split 1.54s, queue full 0.01s
+split-only readers=1 workers=10   1114166 messages     1.800s     618940 msg/s     4077 MB/s JSON  read 0.50s (stalled 0.58s), split 1.31s, queue full 0.01s
+split-only readers=4 workers=10   1114166 messages     0.931s    1196242 msg/s     7880 MB/s JSON  read 1.08s (stalled 0.56s), split 1.55s, queue full 0.01s
+split-only readers=1 workers=10   1114166 messages     2.221s     501629 msg/s     3304 MB/s JSON  read 0.62s (stalled 0.75s), split 1.54s, queue full 0.01s
+split-only readers=4 workers=10   1114166 messages     0.904s    1231991 msg/s     8115 MB/s JSON  read 1.07s (stalled 0.50s), split 1.52s, queue full 0.01s
 == 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)
 OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated
 OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated
 OK   whole corpus, fast 1 worker mmap vs N workers pread: 1114166 requests, identical output lines, none missing or duplicated
+== 2. matcher-only: comparison with nmap semantics (PCRE2 on bytes), 50000 requests (0 = all)
+эталон: каждое правило скомпилировано PCRE2 в байтовом режиме (без UTF, только флаги i/s), без предфильтра; 9.1 с
+запросов 50000: с не-ASCII байтами 1000 (2.000%), с невалидным UTF-8 0 (0.000%); эталон упёрся в лимит перебора 182 раз
+совпадений правил: у нас 63931, у эталона 63932
+запросов, где различаются сработавшие правила: 1 (0.002%); строка вывода: 1 (0.002%); первый hard-сервис: 1 (0.002%)
+правил с расхождением или с лимитом у эталона: 13 из 12172 (при лимите правило в этом запросе не сравнивается)
+
+| строка | проба | тип | сервис | наш движок | только у эталона (ASCII-запросы) | только у нас (ASCII-запросы) | лимит эталона: у нас есть / нет | пример id | правило |
+|---:|---|---|---|---|---:|---:|---:|---:|---|
+| 5297 | TCP NULL | match | landesk-rc | pcre2 | 1 (1) | 0 (0) | 0 / 0 | 1040252 | `^(?!HTTP\|RTSP\|SIP).{264}$` s |
+| 569 | TCP NULL | match | eggdrop | pcre2 | 0 (0) | 0 (0) | 0 / 18 | -1 | `^(?>.*?\(Eggdrop v([\d.]+) \(C\) 1997 Robey Pointer).*?Eggheads` s |
+| 570 | TCP NULL | match | eggdrop | pcre2 | 0 (0) | 0 (0) | 0 / 18 | -1 | `^(?>.*?\(Eggdrop v([\d.]+)\+(\S+) \(C\) 1997 Robey Pointer).*?Eggheads` s |
+| 1962 | TCP NULL | match | ixia-unknown | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*\0\x18Ixia Hardware I/O Server\x13Ixia Communications\x18Ixia Hardw…` s |
+| 2172 | TCP NULL | match | donkey | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*\0\0\0\x06\0Donkey\x01\x0c\0\./donkey\.ini\0\0\0\0\0\0\0\0\0\0\0\0\…` s |
+| 10688 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*<address>Apache/([\d.]+) \([^)]+\) ?(.*) Server at ([-\w_.]+) Port …` si |
+| 10689 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*<address>Apache/([\d.]+) \([^)]+\) Server at ([-\w_.]+) Port \d+</a…` si |
+| 10690 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*<address>Apache/([\d.]+) Server at ([-\w_.]+) Port \d+</address>\n<…` si |
+| 13006 | TCP DNSVersionBindReqTCP | match | qcheck | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*\$Id: //ral_depot/products/current/ENDPOINT/CODE/client\.c` s |
+| 14045 | TCP SMBProgNeg | match | kerberos-sec | go | 0 (0) | 0 (0) | 0 / 18 | -1 | `^.*Internal KDC error, contact administrator` s |
+| 16280 | TCP mongodb | match | mongodb | go | 0 (0) | 0 (0) | 1 / 17 | -1 | `^.*version.....([\.\d]+)` s |
+| 16317 | UDP pc-duo | match | pc-duo | rure | 0 (0) | 0 (0) | 0 / 1 | -1 | `^.........(.*)\0` s |
+| 16324 | UDP pc-duo-gw | match | pc-duo-gw | rure | 0 (0) | 0 (0) | 0 / 1 | -1 | `^.........(.*)\0` s |
 == 2. matcher-only: baseline, naive single-threaded, 100000 requests spread over the corpus
-naive mmap  workers=1      100000 req   172.984s         578 req/s       2.5 MB/s   12172.00 regex calls/req  100000 requests with a match
-fast  mmap  workers=1      100000 req     0.528s      189240 req/s     817.6 MB/s      13.67 regex calls/req  100000 requests with a match
-fast  mmap  workers=1      100000 req     2.082s       48038 req/s     207.5 MB/s      13.67 regex calls/req  100000 requests with a match
-fast  mmap  workers=1      100000 req     0.498s      200655 req/s     866.9 MB/s      13.67 regex calls/req  100000 requests with a match
+naive mmap  workers=1      100000 req   172.079s         581 req/s       2.5 MB/s   12172.00 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.504s      198408 req/s     857.2 MB/s      13.67 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.500s      199833 req/s     863.4 MB/s      13.67 regex calls/req  100000 requests with a match
+fast  mmap  workers=1      100000 req     0.500s      199933 req/s     863.8 MB/s      13.67 regex calls/req  100000 requests with a match
 OK   baseline: naive and fast outputs identical on 100000 requests
 == 2. matcher-only: scaling (hybrid+pcre2)
-fast  mmap  workers=1     1114166 req     5.236s      212808 req/s    1026.7 MB/s      13.65 regex calls/req  1114159 requests with a match
-fast  mmap  workers=10    1114166 req     0.976s     1142120 req/s    5510.1 MB/s      13.65 regex calls/req  1114159 requests with a match
-fast  mmap  workers=1     1114166 req     4.935s      225772 req/s    1089.2 MB/s      13.65 regex calls/req  1114159 requests with a match
-fast  mmap  workers=10    1114166 req     0.946s     1177771 req/s    5682.1 MB/s      13.65 regex calls/req  1114159 requests with a match
-fast  mmap  workers=1     1114166 req     4.898s      227477 req/s    1097.5 MB/s      13.65 regex calls/req  1114159 requests with a match
-fast  mmap  workers=10    1114166 req     0.894s     1246511 req/s    6013.7 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=1     1114166 req     4.934s      225799 req/s    1089.4 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     0.910s     1224656 req/s    5908.3 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=1     1114166 req     4.963s      224481 req/s    1083.0 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     0.911s     1223495 req/s    5902.7 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=1     1114166 req     4.936s      225735 req/s    1089.0 MB/s      13.65 regex calls/req  1114159 requests with a match
+fast  mmap  workers=10    1114166 req     0.903s     1233649 req/s    5951.7 MB/s      13.65 regex calls/req  1114159 requests with a match
 conversion (JSON decode + normalization + write, 10 workers): 10.81s for 1114166 requests, 7339 MB JSON -> 5375 MB normalized
 
-| label | mode | workers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
-|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| stream-simdjson | fast | 1 | 1114166 | 6 | 16.753 | 14.513 | 17.190 | 66504 | 321 | 1.00x | 100% |
-| stream-simdjson | fast | 2 | 1114166 | 3 | 9.075 | 8.636 | 9.363 | 122777 | 592 | 1.85x | 92% |
-| stream-simdjson | fast | 4 | 1114166 | 3 | 5.157 | 4.828 | 5.639 | 216069 | 1042 | 3.25x | 81% |
-| stream-simdjson | fast | 8 | 1114166 | 3 | 4.289 | 4.238 | 4.307 | 259796 | 1253 | 3.91x | 49% |
-| stream-simdjson | fast | 10 | 1114166 | 6 | 4.096 | 3.577 | 4.240 | 272025 | 1312 | 4.09x | 41% |
-| stream-jx | fast | 1 | 1114166 | 3 | 19.604 | 19.576 | 20.788 | 56835 | 274 | 1.00x | 100% |
-| stream-jx | fast | 10 | 1114166 | 3 | 5.108 | 5.010 | 5.153 | 218116 | 1052 | 3.84x | 38% |
-| baseline | naive | 1 | 100000 | 1 | 172.984 | 172.984 | 172.984 | 578 | 2 | 1.00x | 100% |
-| baseline | fast | 1 | 100000 | 3 | 0.528 | 0.498 | 2.082 | 189240 | 818 | 1.00x | 100% |
-| matcher-only | fast | 1 | 1114166 | 3 | 4.935 | 4.898 | 5.236 | 225772 | 1089 | 1.00x | 100% |
-| matcher-only | fast | 10 | 1114166 | 3 | 0.946 | 0.894 | 0.976 | 1177771 | 5682 | 5.22x | 52% |
+| label | mode | workers | readers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| stream-simdjson | fast | 1 | 4 | 1114166 | 6 | 13.696 | 13.560 | 21.564 | 81353 | 392 | 1.00x | 100% |
+| stream-simdjson | fast | 2 | 4 | 1114166 | 3 | 7.019 | 6.974 | 8.611 | 158726 | 766 | 1.95x | 98% |
+| stream-simdjson | fast | 4 | 4 | 1114166 | 3 | 4.017 | 3.930 | 4.596 | 277396 | 1338 | 3.41x | 85% |
+| stream-simdjson | fast | 8 | 4 | 1114166 | 3 | 3.300 | 3.153 | 3.346 | 337577 | 1629 | 4.15x | 52% |
+| stream-simdjson | fast | 10 | 4 | 1114166 | 6 | 2.981 | 2.939 | 3.057 | 373772 | 1803 | 4.59x | 46% |
+| stream-jx | fast | 1 | 4 | 1114166 | 3 | 18.507 | 18.480 | 18.540 | 60203 | 290 | 1.00x | 100% |
+| stream-jx | fast | 10 | 4 | 1114166 | 3 | 4.554 | 4.541 | 4.591 | 244667 | 1180 | 4.06x | 41% |
+| stream-simdjson-readers | fast | 10 | 1 | 1114166 | 3 | 3.167 | 3.145 | 3.305 | 351857 | 1698 | - | - |
+| stream-simdjson-readers | fast | 10 | 2 | 1114166 | 3 | 3.061 | 2.930 | 3.074 | 364001 | 1756 | - | - |
+| stream-simdjson-readers | fast | 10 | 3 | 1114166 | 3 | 3.013 | 2.930 | 3.018 | 369819 | 1784 | - | - |
+| stream-simdjson-readers | fast | 10 | 4 | 1114166 | 3 | 2.990 | 2.958 | 3.010 | 372575 | 1797 | - | - |
+| baseline | naive | 1 | - | 100000 | 1 | 172.079 | 172.079 | 172.079 | 581 | 3 | 1.00x | 100% |
+| baseline | fast | 1 | - | 100000 | 3 | 0.500 | 0.500 | 0.504 | 199833 | 863 | 1.00x | 100% |
+| matcher-only | fast | 1 | - | 1114166 | 3 | 4.936 | 4.934 | 4.963 | 225735 | 1089 | 1.00x | 100% |
+| matcher-only | fast | 10 | - | 1114166 | 3 | 0.910 | 0.903 | 0.911 | 1224656 | 5908 | 5.43x | 54% |
 
-prefilter vs naive, 1 worker, same 100000 requests: 0.53s vs 172.98s = 327x
-     1368.34 real       866.38 user        76.13 sys
+prefilter vs naive, 1 worker, same 100000 requests: 0.50s vs 172.08s = 344x

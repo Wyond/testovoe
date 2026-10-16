@@ -1,0 +1,103 @@
+# Linux arm64 (Docker on Apple M4), 2026-10-17
+== platform: Linux aarch64, go version go1.27.2 linux/arm64
+== libraries: re2 11.0.0, pcre2 10.46, simdjson 3.12.3, cargo 1.85.1 (d73d2caf9 2024-12-31)
+6eee0db build_rure.sh: pin rust-lang/regex to the commit every measurement used
+== pure Go (no native libraries)
+build OK
+ok  	waap-matcher/internal/matcher	1.622s
+== Rust regex (scripts/build_rure.sh)
+librure OK at 72d650c
+== all engines: tests per engine
+go     ok  	waap-matcher/internal/matcher	1.717s
+re2    ok  	waap-matcher/internal/matcher	0.966s
+rure   ok  	waap-matcher/internal/matcher	1.264s
+pcre2  ok  	waap-matcher/internal/matcher	1.058s
+== race detector, stream and oracle tests
+ok  	waap-matcher/internal/matcher	19.800s
+JSON parser: jx, simdjson 
+== QUICK=1 scripts/run.sh on a data subset (timings in a container mean nothing)
+build tags: [re2_cgo rure pcre2 simdjson]; matcher: hybrid+pcre2 -backends config/backends.json -excluded pcre2; JSON parser: simdjson
+== tests
+== prepare: JSON -> binary corpus (matcher-only mode)
+== 1. end-to-end streaming: correctness
+OK   jx: 130273 requests, normalized bytes identical to data/corpus
+OK   simdjson: 130273 requests, normalized bytes identical to data/corpus
+OK   stream (simdjson, 1 workers, 1 readers): output identical to the matcher-only run, 130273 lines
+OK   stream (simdjson, 10 workers, 1 readers): output identical to the matcher-only run, 130273 lines
+OK   stream (simdjson, 10 workers, 4 readers): output identical to the matcher-only run, 130273 lines
+== 1. end-to-end streaming: scaling (simdjson, hybrid+pcre2), results written to results/out.jsonl
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 29 (2 MB, not in Go alloc); read 0.08s (stalled 1.46s), split 0.11s, queue full 2.45s; workers idle 0.11s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 139 (7 MB, not in Go alloc); read 0.51s (stalled 0.00s), split 0.18s, queue full 0.00s; workers idle 0.89s total
+== 1. end-to-end streaming: parser A/B, same matcher, alternating, 1 and 10 workers
+       parsed by jx: 130273, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 0.80s (stalled 1.06s), split 0.18s, queue full 1.96s; workers idle 0.13s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 29 (2 MB, not in Go alloc); read 0.32s (stalled 1.44s), split 0.25s, queue full 2.34s; workers idle 0.06s total
+       parsed by jx: 130273, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 0.52s (stalled 0.00s), split 0.15s, queue full 0.00s; workers idle 0.65s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 146 (9 MB, not in Go alloc); read 0.49s (stalled 0.01s), split 0.14s, queue full 0.00s; workers idle 0.76s total
+== 1. end-to-end streaming: parallel file readers, simdjson, 10 workers
+== 1. end-to-end streaming: reading and element boundaries alone (-split-only)
+== 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)
+OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated
+OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated
+== 2. matcher-only: comparison with nmap semantics (PCRE2 on bytes), 5000 requests (0 = all)
+эталон: каждое правило скомпилировано PCRE2 в байтовом режиме (без UTF, только флаги i/s), без предфильтра; 1.7 с
+запросов 5000: с не-ASCII байтами 14 (0.280%), с невалидным UTF-8 0 (0.000%); эталон упёрся в лимит перебора 0 раз
+совпадений правил: у нас 5629, у эталона 5630
+запросов, где различаются сработавшие правила: 1 (0.020%); строка вывода: 1 (0.020%); первый hard-сервис: 1 (0.020%)
+правил с расхождением или с лимитом у эталона: 1 из 12172 (при лимите правило в этом запросе не сравнивается)
+== 2. matcher-only: baseline, naive single-threaded, 10000 requests spread over the corpus
+OK   baseline: naive and fast outputs identical on 10000 requests
+== 2. matcher-only: scaling (hybrid+pcre2)
+== done
+exit 0
+
+# Linux x86-64 (Docker, emulated), 2026-10-17
+== platform: Linux x86_64, go version go1.27.2 linux/amd64
+== libraries: re2 11.0.0, pcre2 10.46, simdjson 3.12.3, cargo 1.85.1 (d73d2caf9 2024-12-31)
+6eee0db build_rure.sh: pin rust-lang/regex to the commit every measurement used
+== pure Go (no native libraries)
+build OK
+ok  	waap-matcher/internal/matcher	2.053s
+== Rust regex (scripts/build_rure.sh)
+librure OK at 72d650c
+== all engines: tests per engine
+go     ok  	waap-matcher/internal/matcher	2.850s
+re2    ok  	waap-matcher/internal/matcher	1.546s
+rure   ok  	waap-matcher/internal/matcher	1.876s
+pcre2  ok  	waap-matcher/internal/matcher	2.001s
+== race detector, stream and oracle tests
+ok  	waap-matcher/internal/matcher	25.324s
+JSON parser: jx, simdjson 
+== QUICK=1 scripts/run.sh on a data subset (timings in a container mean nothing)
+build tags: [re2_cgo rure pcre2 simdjson]; matcher: hybrid+pcre2 -backends config/backends.json -excluded pcre2; JSON parser: simdjson
+== tests
+== prepare: JSON -> binary corpus (matcher-only mode)
+== 1. end-to-end streaming: correctness
+OK   jx: 130273 requests, normalized bytes identical to data/corpus
+OK   simdjson: 130273 requests, normalized bytes identical to data/corpus
+OK   stream (simdjson, 1 workers, 1 readers): output identical to the matcher-only run, 130273 lines
+OK   stream (simdjson, 10 workers, 1 readers): output identical to the matcher-only run, 130273 lines
+OK   stream (simdjson, 10 workers, 4 readers): output identical to the matcher-only run, 130273 lines
+== 1. end-to-end streaming: scaling (simdjson, hybrid+pcre2), results written to results/out.jsonl
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 29 (2 MB, not in Go alloc); read 0.68s (stalled 1.72s), split 0.12s, queue full 3.51s; workers idle 0.14s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 154 (8 MB, not in Go alloc); read 0.64s (stalled 0.15s), split 0.20s, queue full 0.26s; workers idle 0.61s total
+== 1. end-to-end streaming: parser A/B, same matcher, alternating, 1 and 10 workers
+       parsed by jx: 130273, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 0.29s (stalled 2.58s), split 0.59s, queue full 4.44s; workers idle 0.09s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 29 (2 MB, not in Go alloc); read 0.60s (stalled 1.90s), split 0.46s, queue full 3.68s; workers idle 0.16s total
+       parsed by jx: 130273, fallback to jx: 0 map[]; C++ buffer growths 0 (0 MB, not in Go alloc); read 0.66s (stalled 0.20s), split 0.22s, queue full 0.23s; workers idle 0.72s total
+       parsed by simdjson: 130273, fallback to jx: 0 map[]; C++ buffer growths 159 (9 MB, not in Go alloc); read 0.64s (stalled 0.15s), split 0.19s, queue full 0.25s; workers idle 0.75s total
+== 1. end-to-end streaming: parallel file readers, simdjson, 10 workers
+== 1. end-to-end streaming: reading and element boundaries alone (-split-only)
+== 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)
+OK   naive vs fast: 20000 requests, identical output lines, none missing or duplicated
+OK   fast 1 worker vs 10 workers: 20000 requests, identical output lines, none missing or duplicated
+== 2. matcher-only: comparison with nmap semantics (PCRE2 on bytes), 5000 requests (0 = all)
+эталон: каждое правило скомпилировано PCRE2 в байтовом режиме (без UTF, только флаги i/s), без предфильтра; 10.0 с
+запросов 5000: с не-ASCII байтами 14 (0.280%), с невалидным UTF-8 0 (0.000%); эталон упёрся в лимит перебора 0 раз
+совпадений правил: у нас 5629, у эталона 5630
+запросов, где различаются сработавшие правила: 1 (0.020%); строка вывода: 1 (0.020%); первый hard-сервис: 1 (0.020%)
+правил с расхождением или с лимитом у эталона: 1 из 12172 (при лимите правило в этом запросе не сравнивается)
+== 2. matcher-only: baseline, naive single-threaded, 10000 requests spread over the corpus
+OK   baseline: naive and fast outputs identical on 10000 requests
+== 2. matcher-only: scaling (hybrid+pcre2)
+== done
+exit 0
