@@ -99,9 +99,15 @@ func (m *Matcher) MatchFast(req []byte, w *Worker) []uint32 {
 // Service names are listed in priority order, once per kind. A service present in both
 // kinds is kept in both. Names were checked to be JSON-safe ASCII when the rules loaded.
 func (m *Matcher) appendResult(dst []byte, id int, ids []uint32, w *Worker) []byte {
-	w.stamp++
 	dst = append(dst, `{"id":`...)
 	dst = strconv.AppendInt(dst, int64(id), 10)
+	return m.appendResultTail(dst, ids, w)
+}
+
+// appendResultTail writes everything after the id: `,"hard":[...],"soft":[...]}` and a
+// newline. The streaming writer adds the id once the file's position is known.
+func (m *Matcher) appendResultTail(dst []byte, ids []uint32, w *Worker) []byte {
+	w.stamp++
 	for k, key := range [2]string{`,"hard":[`, `,"soft":[`} {
 		dst = append(dst, key...)
 		seen, first := w.seen, true

@@ -6,6 +6,7 @@
 #   QUICK=1 scripts/run.sh                                 # ~2-3 min smoke run, not for the README
 #   WORKERS="1 2 4 8" REPEATS=3 BASELINE=100000 PAUSE=0 scripts/run.sh
 #   PARSER=jx scripts/run.sh                               # control run: jx instead of simdjson
+#   READERS=1 scripts/run.sh                               # files read one at a time (default 4 in parallel)
 #   ENGINES=go PARSER=jx scripts/run.sh                    # no native libraries at all
 #
 # Two modes are measured and reported separately:
@@ -62,6 +63,7 @@ else
 fi
 case " $TAGS " in *" pcre2 "*) MAIN=(-backends results/backends.json -excluded pcre2); MAIN_LABEL=hybrid+pcre2 ;; *) MAIN=(); MAIN_LABEL=go ;; esac
 PARSER=${PARSER:-simdjson}
+READERS=${READERS:-4} # files read and split in parallel in the streaming mode
 if [ "$PARSER" = simdjson ]; then
   case " $TAGS " in *" simdjson "*) ;; *)
     echo "simdjson is not available (brew install simdjson pkg-config); PARSER=jx scripts/run.sh runs the control instead" >&2
@@ -90,7 +92,7 @@ C=(-probes "$PROBES" ${MAIN[@]+"${MAIN[@]}"}) # bash 3.2 (macOS) rejects "${a[@]
 INPUT=("$LEGIT" "$MAL")
 M=results/metrics.jsonl
 rm -f "$M"
-stream() { sleep "$PAUSE"; bin/matcher stream "${C[@]}" -metrics "$M" "$@" "${INPUT[@]}" | grep -A1 '^stream' | cut -c1-250; }
+stream() { sleep "$PAUSE"; bin/matcher stream "${C[@]}" -readers "$READERS" -metrics "$M" "$@" "${INPUT[@]}" | grep -A1 '^stream' | cut -c1-250; }
 run() { sleep "$PAUSE"; bin/matcher run "${C[@]}" -corpus "$CORPUS" -metrics "$M" "$@" | tail -1; }
 
 if [ "${MAIN_LABEL}" != go ] && [ ! -f results/backends.json ]; then
@@ -113,12 +115,14 @@ for p in $(bin/matcher stream -h 2>&1 | grep -o 'JSON parser: [a-z, ]*' | sed 's
 done
 bin/matcher run "${C[@]}" -corpus "$CORPUS" -workers "$NCPU" -out results/out-corpus.jsonl > /dev/null
 sort results/out-corpus.jsonl > results/out-corpus.sorted
-for w in 1 "$NCPU"; do
-  bin/matcher stream "${C[@]}" -parser "$PARSER" -workers "$w" -out results/out-stream.jsonl "${INPUT[@]}" > /dev/null
+for wk in "1 1" "$NCPU 1" "$NCPU $READERS"; do
+  w=${wk% *}; k=${wk#* }
+  rm -f results/out-stream.jsonl
+  bin/matcher stream "${C[@]}" -parser "$PARSER" -workers "$w" -readers "$k" -out results/out-stream.jsonl "${INPUT[@]}" > /dev/null
   if sort results/out-stream.jsonl | cmp -s - results/out-corpus.sorted; then
-    echo "OK   stream ($PARSER, $w workers): output identical to the matcher-only run, $(wc -l < results/out-stream.jsonl | tr -d ' ') lines"
+    echo "OK   stream ($PARSER, $w workers, $k readers): output identical to the matcher-only run, $(wc -l < results/out-stream.jsonl | tr -d ' ') lines"
   else
-    echo "FAIL stream ($PARSER, $w workers): output differs from the matcher-only run"; exit 1
+    echo "FAIL stream ($PARSER, $w workers, $k readers): output differs from the matcher-only run"; exit 1
   fi
 done
 rm -f results/out-corpus.sorted results/out-stream.jsonl results/out-corpus.jsonl
@@ -136,9 +140,17 @@ if [ "$PARSER" != jx ]; then
     done
   done
 fi
+echo "== 1. end-to-end streaming: parallel file readers, $PARSER, $NCPU workers"
+for _ in $(seq "$REPEATS"); do
+  for k in 1 2 3 4; do
+    sleep "$PAUSE"; bin/matcher stream "${C[@]}" -parser "$PARSER" -workers "$NCPU" -readers "$k" -label "stream-$PARSER-readers" -metrics "$M" -out results/out.jsonl "${INPUT[@]}" | grep '^stream' | cut -c1-120
+  done
+done
 echo "== 1. end-to-end streaming: reading and element boundaries alone (-split-only)"
 for _ in $(seq "$REPEATS"); do
-  sleep "$PAUSE"; bin/matcher stream "${C[@]}" -split-only -workers "$NCPU" "${INPUT[@]}" | grep '^split-only'
+  for k in 1 "$READERS"; do
+    sleep "$PAUSE"; bin/matcher stream "${C[@]}" -split-only -workers "$NCPU" -readers "$k" "${INPUT[@]}" | grep '^split-only'
+  done
 done
 
 echo "== 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)"

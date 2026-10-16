@@ -293,11 +293,12 @@ func summary(args []string) {
 		Requests int64   `json:"requests"`
 		Seconds  float64 `json:"matching_with_output_seconds"`
 		Bytes    int64   `json:"payload_bytes"`
+		Readers  int     `json:"Readers"` // streaming runs only
 	}
 	type key struct {
-		label, mode string
-		workers     int
-		requests    int64
+		label, mode      string
+		workers, readers int
+		requests         int64
 	}
 	groups := map[key][]float64{}
 	bytes := map[key]int64{}
@@ -308,7 +309,7 @@ func summary(args []string) {
 		if err := dec.Decode(&r); err != nil {
 			log.Fatal(err)
 		}
-		k := key{r.Label, r.Mode, r.Workers, r.Requests}
+		k := key{r.Label, r.Mode, r.Workers, r.Readers, r.Requests}
 		if _, ok := groups[k]; !ok {
 			order = append(order, k)
 		}
@@ -326,8 +327,8 @@ func summary(args []string) {
 			base[fmt.Sprint(k.label, k.mode, k.requests)] = med(k)
 		}
 	}
-	fmt.Println("| label | mode | workers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |")
-	fmt.Println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
+	fmt.Println("| label | mode | workers | readers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |")
+	fmt.Println("|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|")
 	for _, k := range order {
 		v := append([]float64(nil), groups[k]...)
 		sort.Float64s(v)
@@ -336,8 +337,12 @@ func summary(args []string) {
 		if b, ok := base[fmt.Sprint(k.label, k.mode, k.requests)]; ok {
 			sp = fmt.Sprintf("%.2fx | %.0f%%", b/m, 100*b/m/float64(k.workers))
 		}
-		fmt.Printf("| %s | %s | %d | %d | %d | %.3f | %.3f | %.3f | %.0f | %.0f | %s |\n",
-			k.label, k.mode, k.workers, k.requests, len(v), m, v[0], v[len(v)-1],
+		readers := "-"
+		if k.readers > 0 {
+			readers = strconv.Itoa(k.readers)
+		}
+		fmt.Printf("| %s | %s | %d | %s | %d | %d | %.3f | %.3f | %.3f | %.0f | %.0f | %s |\n",
+			k.label, k.mode, k.workers, readers, k.requests, len(v), m, v[0], v[len(v)-1],
 			float64(k.requests)/m, float64(bytes[k])/1e6/m, sp)
 	}
 	// naive vs fast on the same sample, both single-threaded
@@ -345,7 +350,7 @@ func summary(args []string) {
 		if k.mode != "naive" || k.workers != 1 {
 			continue
 		}
-		if f := (key{k.label, "fast", 1, k.requests}); len(groups[f]) > 0 {
+		if f := (key{k.label, "fast", 1, k.readers, k.requests}); len(groups[f]) > 0 {
 			fmt.Printf("\nprefilter vs naive, 1 worker, same %d requests: %.2fs vs %.2fs = %.0fx\n", k.requests, med(f), med(k), med(k)/med(f))
 		}
 	}
@@ -399,6 +404,7 @@ func stream(args []string) {
 	cpuProf := fs.String("cpuprofile", "", "write a CPU profile")
 	memProf := fs.String("memprofile", "", "write an allocation profile (every allocation sampled)")
 	splitOnly := fs.Bool("split-only", false, "only read the files and find element boundaries (cost of message splitting)")
+	readers := fs.Int("readers", 1, "files read and split in parallel (each file in order, like a partition with one consumer)")
 	fs.Parse(args)
 	if fs.NArg() == 0 {
 		log.Fatal("usage: matcher stream [flags] <json dir>...")
@@ -411,7 +417,7 @@ func stream(args []string) {
 	m := c.rules()
 	initSec := time.Since(t).Seconds()
 	fmt.Printf("parser %s: %s; %d files; rule initialization %.2fs\n", *parser, matcher.ParserBackend(*parser), len(paths), initSec)
-	cfg := matcher.StreamConfig{Mode: *mode, Parser: *parser, Workers: *workers, ChunkSize: *chunk, QueueBytes: *queueMB << 20, SplitOnly: *splitOnly}
+	cfg := matcher.StreamConfig{Mode: *mode, Parser: *parser, Workers: *workers, ChunkSize: *chunk, QueueBytes: *queueMB << 20, SplitOnly: *splitOnly, Readers: *readers}
 	var outF *os.File
 	if *outPath != "" {
 		if outF, err = os.Create(*outPath); err != nil {
@@ -450,19 +456,19 @@ func stream(args []string) {
 	var ru syscall.Rusage
 	syscall.Getrusage(syscall.RUSAGE_SELF, &ru)
 	if r.SplitOnly {
-		fmt.Printf("split-only workers=%-2d %9d messages  %8.3fs  %9.0f msg/s  %7.0f MB/s JSON  read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs\n",
-			*workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec)
+		fmt.Printf("split-only readers=%d workers=%-2d %9d messages  %8.3fs  %9.0f msg/s  %7.0f MB/s JSON  read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs\n",
+			r.Readers, *workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec)
 		return
 	}
 	ps := r.Parse
-	fmt.Printf("stream %-8s workers=%-2d %9d req  %8.3fs  %9.0f req/s  %7.0f MB/s JSON  %6.2f regex calls/req  Go alloc %.0f MB (%.2f allocs/req)  GC %d  peak RSS %.2f GB\n",
-		*parser, *workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.RegexCalls, float64(r.AllocBytes)/1e6,
+	fmt.Printf("stream %-8s readers=%d workers=%-2d %9d req  %8.3fs  %9.0f req/s  %7.0f MB/s JSON  %6.2f regex calls/req  Go alloc %.0f MB (%.2f allocs/req)  GC %d  peak RSS %.2f GB\n",
+		*parser, r.Readers, *workers, r.Requests, r.Seconds, r.ReqPerSec, r.MBPerSec, r.RegexCalls, float64(r.AllocBytes)/1e6,
 		float64(r.Allocs)/float64(max(r.Requests, 1)), r.NumGC, float64(ru.Maxrss)/(1<<30))
 	fmt.Printf("       parsed by %s: %d, fallback to jx: %d %v; C++ buffer growths %d (%.0f MB, not in Go alloc); read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs; workers idle %.2fs total\n",
 		ps.Primary, ps.PrimaryMsgs, ps.FallbackMsgs, ps.Reasons, ps.NativeGrowths, float64(ps.NativeGrowthBytes)/1e6,
 		r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec, r.WorkerIdleSec)
-	fmt.Printf("       worker time, summed over workers: JSON parse+normalize %.2fs, prefilter+regex %.2fs, result formatting %.2fs, output write %.2fs\n",
-		r.ParseSec, r.MatchSec, r.FormatSec, r.WriteSec)
+	fmt.Printf("       worker time, summed over workers: JSON parse+normalize %.2fs, prefilter+regex %.2fs, result formatting %.2fs, hand-over %.2fs; writer (ids, hash, write) %.2fs\n",
+		r.ParseSec, r.MatchSec, r.FormatSec, r.WriteSec, r.WriterSec)
 	if ps.PrimaryMsgs+ps.FallbackMsgs != r.Requests {
 		log.Fatalf("parser counters cover %d messages, %d were processed", ps.PrimaryMsgs+ps.FallbackMsgs, r.Requests)
 	}

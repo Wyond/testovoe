@@ -1,0 +1,164 @@
+# E24: K=1..4 readers, simdjson, hybrid+pcre2, 10 workers; 3 rounds, 20 s pause before each run
+### rep=1 full K=1
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.20s
+stream simdjson readers=1 workers=10   1114166 req     3.972s     280538 req/s     1848 MB/s JSON   13.65 regex calls/req  Go alloc 9104 MB (0.03 allocs/req)  GC 25  peak RSS 2.06 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 453 (1183 MB, not in Go alloc); read 2.40s (stalled 0.46s), split 1.69s, queue full 0.56s; workers idle 22.64s total
+       worker time, summed over workers: JSON parse+normalize 9.12s, prefilter+regex 7.75s, result formatting 0.06s, hand-over 0.01s; writer (ids, hash, write) 0.04s
+### rep=1 full K=2
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.23s
+stream simdjson readers=2 workers=10   1114166 req     3.702s     300948 req/s     1982 MB/s JSON   13.65 regex calls/req  Go alloc 9693 MB (0.03 allocs/req)  GC 23  peak RSS 2.22 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 451 (1183 MB, not in Go alloc); read 3.44s (stalled 0.86s), split 2.07s, queue full 0.66s; workers idle 16.18s total
+       worker time, summed over workers: JSON parse+normalize 10.41s, prefilter+regex 10.14s, result formatting 0.09s, hand-over 0.02s; writer (ids, hash, write) 0.07s
+### rep=1 full K=3
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.20s
+stream simdjson readers=3 workers=10   1114166 req     3.491s     319142 req/s     2102 MB/s JSON   13.65 regex calls/req  Go alloc 9310 MB (0.03 allocs/req)  GC 19  peak RSS 2.24 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 445 (1184 MB, not in Go alloc); read 4.68s (stalled 0.98s), split 2.17s, queue full 0.86s; workers idle 13.11s total
+       worker time, summed over workers: JSON parse+normalize 11.11s, prefilter+regex 10.39s, result formatting 0.11s, hand-over 0.01s; writer (ids, hash, write) 0.08s
+### rep=1 full K=4
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.20s
+stream simdjson readers=4 workers=10   1114166 req     3.385s     329142 req/s     2168 MB/s JSON   13.65 regex calls/req  Go alloc 9278 MB (0.03 allocs/req)  GC 17  peak RSS 2.10 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 444 (1184 MB, not in Go alloc); read 5.92s (stalled 1.25s), split 2.23s, queue full 1.55s; workers idle 11.53s total
+       worker time, summed over workers: JSON parse+normalize 11.25s, prefilter+regex 10.73s, result formatting 0.10s, hand-over 0.02s; writer (ids, hash, write) 0.10s
+### rep=1 split K=1
+split-only readers=1 workers=10   1114166 messages     3.104s     358993 msg/s     2365 MB/s JSON  read 2.35s (stalled 0.34s), split 1.45s, queue full 0.01s
+### rep=1 split K=2
+split-only readers=2 workers=10   1114166 messages     2.525s     441294 msg/s     2907 MB/s JSON  read 3.51s (stalled 0.34s), split 1.53s, queue full 0.01s
+### rep=1 split K=3
+split-only readers=3 workers=10   1114166 messages     2.378s     468471 msg/s     3086 MB/s JSON  read 4.83s (stalled 0.29s), split 1.66s, queue full 0.01s
+### rep=1 split K=4
+split-only readers=4 workers=10   1114166 messages     2.306s     483244 msg/s     3183 MB/s JSON  read 6.52s (stalled 0.24s), split 1.62s, queue full 0.01s
+### rep=2 full K=1
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=1 workers=10   1114166 req     4.065s     274071 req/s     1805 MB/s JSON   13.65 regex calls/req  Go alloc 9249 MB (0.03 allocs/req)  GC 24  peak RSS 1.93 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 463 (1185 MB, not in Go alloc); read 2.41s (stalled 0.52s), split 1.75s, queue full 0.51s; workers idle 23.37s total
+       worker time, summed over workers: JSON parse+normalize 8.95s, prefilter+regex 8.06s, result formatting 0.07s, hand-over 0.01s; writer (ids, hash, write) 0.07s
+### rep=2 full K=2
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=2 workers=10   1114166 req     3.614s     308265 req/s     2031 MB/s JSON   13.65 regex calls/req  Go alloc 9298 MB (0.03 allocs/req)  GC 22  peak RSS 2.23 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 465 (1184 MB, not in Go alloc); read 3.50s (stalled 0.71s), split 1.98s, queue full 0.71s; workers idle 15.29s total
+       worker time, summed over workers: JSON parse+normalize 10.51s, prefilter+regex 10.06s, result formatting 0.10s, hand-over 0.04s; writer (ids, hash, write) 0.06s
+### rep=2 full K=3
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=3 workers=10   1114166 req     3.561s     312846 req/s     2061 MB/s JSON   13.65 regex calls/req  Go alloc 9365 MB (0.03 allocs/req)  GC 19  peak RSS 2.05 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 483 (1191 MB, not in Go alloc); read 4.77s (stalled 0.99s), split 2.24s, queue full 0.79s; workers idle 13.61s total
+       worker time, summed over workers: JSON parse+normalize 10.94s, prefilter+regex 10.71s, result formatting 0.11s, hand-over 0.08s; writer (ids, hash, write) 0.09s
+### rep=2 full K=4
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.24s
+stream simdjson readers=4 workers=10   1114166 req     3.470s     321049 req/s     2115 MB/s JSON   13.65 regex calls/req  Go alloc 9431 MB (0.03 allocs/req)  GC 17  peak RSS 2.11 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 395 (1190 MB, not in Go alloc); read 6.03s (stalled 1.29s), split 2.33s, queue full 1.41s; workers idle 11.44s total
+       worker time, summed over workers: JSON parse+normalize 11.74s, prefilter+regex 11.16s, result formatting 0.10s, hand-over 0.09s; writer (ids, hash, write) 0.12s
+### rep=2 split K=1
+split-only readers=1 workers=10   1114166 messages     3.061s     363992 msg/s     2398 MB/s JSON  read 2.37s (stalled 0.30s), split 1.41s, queue full 0.01s
+### rep=2 split K=2
+split-only readers=2 workers=10   1114166 messages     2.587s     430746 msg/s     2837 MB/s JSON  read 3.57s (stalled 0.35s), split 1.64s, queue full 0.01s
+### rep=2 split K=3
+split-only readers=3 workers=10   1114166 messages     2.357s     472673 msg/s     3113 MB/s JSON  read 4.82s (stalled 0.30s), split 1.69s, queue full 0.01s
+### rep=2 split K=4
+split-only readers=4 workers=10   1114166 messages     2.480s     449186 msg/s     2959 MB/s JSON  read 6.72s (stalled 0.34s), split 1.77s, queue full 0.01s
+### rep=3 full K=1
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=1 workers=10   1114166 req     4.115s     270741 req/s     1783 MB/s JSON   13.65 regex calls/req  Go alloc 9071 MB (0.03 allocs/req)  GC 20  peak RSS 2.11 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 450 (1184 MB, not in Go alloc); read 2.47s (stalled 0.48s), split 1.83s, queue full 0.54s; workers idle 23.54s total
+       worker time, summed over workers: JSON parse+normalize 9.09s, prefilter+regex 8.27s, result formatting 0.08s, hand-over 0.01s; writer (ids, hash, write) 0.07s
+### rep=3 full K=2
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=2 workers=10   1114166 req     3.586s     310679 req/s     2046 MB/s JSON   13.65 regex calls/req  Go alloc 9396 MB (0.03 allocs/req)  GC 20  peak RSS 2.19 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 441 (1185 MB, not in Go alloc); read 3.45s (stalled 0.74s), split 1.98s, queue full 0.74s; workers idle 14.90s total
+       worker time, summed over workers: JSON parse+normalize 10.49s, prefilter+regex 10.21s, result formatting 0.09s, hand-over 0.01s; writer (ids, hash, write) 0.06s
+### rep=3 full K=3
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.20s
+stream simdjson readers=3 workers=10   1114166 req     3.455s     322524 req/s     2124 MB/s JSON   13.65 regex calls/req  Go alloc 9411 MB (0.03 allocs/req)  GC 20  peak RSS 2.05 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 448 (1187 MB, not in Go alloc); read 4.77s (stalled 0.91s), split 2.10s, queue full 0.83s; workers idle 13.52s total
+       worker time, summed over workers: JSON parse+normalize 10.64s, prefilter+regex 10.08s, result formatting 0.10s, hand-over 0.04s; writer (ids, hash, write) 0.09s
+### rep=3 full K=4
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+parser simdjson: simdjson 4.6.4, arm64 (ARM NEON); 699 files; rule initialization 0.21s
+stream simdjson readers=4 workers=10   1114166 req     3.457s     322299 req/s     2123 MB/s JSON   13.65 regex calls/req  Go alloc 9188 MB (0.03 allocs/req)  GC 19  peak RSS 2.46 GB
+       parsed by simdjson: 1114166, fallback to jx: 0 map[]; C++ buffer growths 441 (1184 MB, not in Go alloc); read 5.84s (stalled 1.36s), split 2.31s, queue full 2.03s; workers idle 12.47s total
+       worker time, summed over workers: JSON parse+normalize 11.13s, prefilter+regex 10.59s, result formatting 0.09s, hand-over 0.14s; writer (ids, hash, write) 0.09s
+### rep=3 split K=1
+split-only readers=1 workers=10   1114166 messages     3.045s     365856 msg/s     2410 MB/s JSON  read 2.36s (stalled 0.24s), split 1.43s, queue full 0.01s
+### rep=3 split K=2
+split-only readers=2 workers=10   1114166 messages     2.442s     456323 msg/s     3006 MB/s JSON  read 3.56s (stalled 0.25s), split 1.46s, queue full 0.00s
+### rep=3 split K=3
+split-only readers=3 workers=10   1114166 messages     2.435s     457620 msg/s     3014 MB/s JSON  read 4.92s (stalled 0.30s), split 1.66s, queue full 0.01s
+### rep=3 split K=4
+split-only readers=4 workers=10   1114166 messages     2.313s     481594 msg/s     3172 MB/s JSON  read 6.63s (stalled 0.21s), split 1.53s, queue full 0.01s
+DONE
+
+# E24: K=1 vs K=4 where readers are not the limit (jx 10 workers; simdjson 1 worker), alternating, 20 s pause
+stream jx       readers=1 workers=10   1114166 req     5.520s     201848 re
+stream jx       readers=4 workers=10   1114166 req     5.033s     221383 re
+stream simdjson readers=1 workers=1    1114166 req    15.635s      71260 re
+stream simdjson readers=4 workers=1    1114166 req    15.701s      70961 re
+stream jx       readers=1 workers=10   1114166 req     5.350s     208236 re
+stream jx       readers=4 workers=10   1114166 req     4.835s     230436 re
+stream simdjson readers=1 workers=1    1114166 req    15.710s      70919 re
+stream simdjson readers=4 workers=1    1114166 req    15.987s      69692 re
+stream jx       readers=1 workers=10   1114166 req     5.257s     211944 re
+stream jx       readers=4 workers=10   1114166 req     4.684s     237871 re
+stream simdjson readers=1 workers=1    1114166 req    15.819s      70433 re
+stream simdjson readers=4 workers=1    1114166 req    14.992s      74317 re
+
+# README: worker scaling and parser A/B with 4 readers, 20 s pause
+stream simdjson readers=4 workers=1    1114166 req    15.097s      73798 req/s      486 MB
+stream simdjson readers=4 workers=2    1114166 req     8.461s     131688 req/s      867 MB
+stream simdjson readers=4 workers=4    1114166 req     4.435s     251245 req/s     1655 MB
+stream simdjson readers=4 workers=8    1114166 req     3.723s     299302 req/s     1971 MB
+stream simdjson readers=4 workers=10   1114166 req     3.712s     300157 req/s     1977 MB
+stream simdjson readers=4 workers=1    1114166 req    15.658s      71159 req/s      469 MB
+stream simdjson readers=4 workers=2    1114166 req     8.142s     136845 req/s      901 MB
+stream simdjson readers=4 workers=4    1114166 req     4.537s     245563 req/s     1618 MB
+stream simdjson readers=4 workers=8    1114166 req     3.449s     323002 req/s     2128 MB
+stream simdjson readers=4 workers=10   1114166 req     3.276s     340073 req/s     2240 MB
+stream simdjson readers=4 workers=1    1114166 req    15.379s      72447 req/s      477 MB
+stream simdjson readers=4 workers=2    1114166 req     8.244s     135142 req/s      890 MB
+stream simdjson readers=4 workers=4    1114166 req     4.740s     235061 req/s     1548 MB
+stream simdjson readers=4 workers=8    1114166 req     3.411s     326610 req/s     2151 MB
+stream simdjson readers=4 workers=10   1114166 req     3.528s     315800 req/s     2080 MB
+stream jx       readers=4 workers=1    1114166 req    21.167s      52637 req/s      347 MB
+stream simdjson readers=4 workers=1    1114166 req    15.779s      70609 req/s      465 MB
+stream jx       readers=4 workers=10   1114166 req     5.166s     215668 req/s     1421 MB
+stream simdjson readers=4 workers=10   1114166 req     3.481s     320115 req/s     2109 MB
+stream jx       readers=4 workers=1    1114166 req    19.774s      56345 req/s      371 MB
+stream simdjson readers=4 workers=1    1114166 req    14.627s      76172 req/s      502 MB
+stream jx       readers=4 workers=10   1114166 req     4.725s     235781 req/s     1553 MB
+stream simdjson readers=4 workers=10   1114166 req     3.212s     346858 req/s     2285 MB
+stream jx       readers=4 workers=1    1114166 req    20.306s      54870 req/s      361 MB
+stream simdjson readers=4 workers=1    1114166 req    15.376s      72461 req/s      477 MB
+stream jx       readers=4 workers=10   1114166 req     4.775s     233313 req/s     1537 MB
+stream simdjson readers=4 workers=10   1114166 req     3.472s     320876 req/s     2114 MB
+| label | mode | workers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| stream-simdjson | fast | 1 | 1114166 | 3 | 15.379 | 15.097 | 15.658 | 72447 | 350 | 1.00x | 100% |
+| stream-simdjson | fast | 2 | 1114166 | 3 | 8.244 | 8.142 | 8.461 | 135142 | 652 | 1.87x | 93% |
+| stream-simdjson | fast | 4 | 1114166 | 3 | 4.537 | 4.435 | 4.740 | 245563 | 1185 | 3.39x | 85% |
+| stream-simdjson | fast | 8 | 1114166 | 3 | 3.449 | 3.411 | 3.723 | 323002 | 1558 | 4.46x | 56% |
+| stream-simdjson | fast | 10 | 1114166 | 3 | 3.528 | 3.276 | 3.712 | 315800 | 1524 | 4.36x | 44% |
+| ab-jx | fast | 1 | 1114166 | 3 | 20.306 | 19.774 | 21.167 | 54870 | 265 | 1.00x | 100% |
+| ab-simdjson | fast | 1 | 1114166 | 3 | 15.376 | 14.627 | 15.779 | 72461 | 350 | 1.00x | 100% |
+| ab-jx | fast | 10 | 1114166 | 3 | 4.775 | 4.725 | 5.166 | 233313 | 1126 | 4.25x | 43% |
+| ab-simdjson | fast | 10 | 1114166 | 3 | 3.472 | 3.212 | 3.481 | 320876 | 1548 | 4.43x | 44% |

@@ -77,6 +77,9 @@ func TestStreamMatchesCorpus(t *testing.T) {
 			{Parser: parser, Workers: 4, ChunkSize: 64, QueueJobs: 2, QueueBytes: 256}, // elements cross chunks, chunks grow
 			{Parser: parser, Workers: 3, ChunkSize: 1000},
 			{Parser: parser, Workers: 2, Mode: "naive", ChunkSize: 4096},
+			{Parser: parser, Workers: 4, Readers: 3, ChunkSize: 64, QueueBytes: 256}, // files in parallel, ids by file position
+			{Parser: parser, Workers: 2, Readers: 8, Window: 2, ChunkSize: 100},      // window raised to the reader count
+			{Parser: parser, Workers: 1, Readers: 2, ChunkSize: 4096, QueueBytes: 1}, // backpressure on every chunk
 		} {
 			r, err := RunStream(m, paths, cfg)
 			if err != nil {
@@ -112,6 +115,41 @@ func rehash(t *testing.T, m *Matcher, s *Store, r *StreamResult) []uint64 {
 	return out.Hashes
 }
 
+// Many small files and a window as narrow as the reader count: readers wait for the
+// window, and results of later files wait in the writer for earlier counts.
+func TestStreamReaderWindow(t *testing.T) {
+	m := testMatcher(t)
+	in := validStreamInputs()
+	var files []string
+	for i := 0; i < 24; i++ {
+		files = append(files, in[i%len(in)])
+	}
+	paths := streamFiles(t, files...)
+	corpus := filepath.Join(t.TempDir(), "corpus")
+	if _, err := Convert([]string{filepath.Dir(paths[0])}, corpus, 2, "jx", 1<<30); err != nil {
+		t.Fatal(err)
+	}
+	s, _ := OpenStore(corpus)
+	defer s.Close()
+	var want strings.Builder
+	if _, err := Run(m, s, Config{Mode: "fast", Workers: 1, Out: &want}); err != nil {
+		t.Fatal(err)
+	}
+	for _, cfg := range []StreamConfig{
+		{Parser: "jx", Workers: 3, Readers: 3, Window: 3, ChunkSize: 64},
+		{Parser: "jx", Workers: 1, Readers: 4, Window: 4, ChunkSize: 4096, QueueBytes: 1},
+	} {
+		var got strings.Builder
+		cfg.Out = &got
+		if _, err := RunStream(m, paths, cfg); err != nil {
+			t.Fatalf("%+v: %v", cfg, err)
+		}
+		if sortedLines(got.String()) != sortedLines(want.String()) {
+			t.Errorf("%+v: output differs from the corpus run", cfg)
+		}
+	}
+}
+
 // The stronger check: the stream's own output lines, compared by id with the corpus run.
 func TestStreamOutputLines(t *testing.T) {
 	m := testMatcher(t)
@@ -128,7 +166,7 @@ func TestStreamOutputLines(t *testing.T) {
 	}
 	for _, parser := range ParserNames() {
 		var got strings.Builder
-		if _, err := RunStream(m, paths, StreamConfig{Parser: parser, Workers: 3, ChunkSize: 100, Out: &got}); err != nil {
+		if _, err := RunStream(m, paths, StreamConfig{Parser: parser, Workers: 3, Readers: 3, ChunkSize: 100, Out: &got}); err != nil {
 			t.Fatal(err)
 		}
 		if a, b := sortedLines(got.String()), sortedLines(want.String()); a != b {
@@ -173,7 +211,7 @@ func TestStreamRejectsBrokenJSON(t *testing.T) {
 	for _, parser := range ParserNames() {
 		for name, doc := range broken {
 			paths := streamFiles(t, `[{"method":"GET","url":"/ok"}]`, doc)
-			if _, err := RunStream(m, paths, StreamConfig{Parser: parser, Workers: 2, ChunkSize: 16}); err == nil {
+			if _, err := RunStream(m, paths, StreamConfig{Parser: parser, Workers: 2, Readers: 2, ChunkSize: 16}); err == nil {
 				t.Errorf("%s / %s: no error", parser, name)
 			}
 		}
