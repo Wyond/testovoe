@@ -53,3 +53,43 @@ new fast  mmap  workers=1     1114166 req     7.805s      142742 req/s     688.7
 | new-matcher-only | fast | 10 | - | 1114166 | 3 | 2.205 | 1.989 | 2.213 | 505359 | 2438 | 3.54x | 35% |
 | old-matcher-only | fast | 1 | - | 1114166 | 3 | 7.448 | 6.932 | 7.851 | 149583 | 722 | 1.00x | 100% |
 | new-matcher-only | fast | 1 | - | 1114166 | 3 | 7.805 | 7.157 | 8.169 | 142742 | 689 | 1.00x | 100% |
+
+# E26 final: old (ea769bf) vs new (d8c74f1), separate warm series for matcher-only and stream, no background load
+# load before: 126.7% CPU total, swap 0.00M
+== 1. matcher-only (warm cache, no stream runs in between)
+old fast  mmap  workers=10    1114166 req     0.907s     1228007 req/s    5924.5 MB/
+new fast  mmap  workers=10    1114166 req     0.904s     1232478 req/s    5946.0 MB/
+old fast  mmap  workers=1     1114166 req     4.910s      226898 req/s    1094.7 MB/
+new fast  mmap  workers=1     1114166 req     4.869s      228836 req/s    1104.0 MB/
+new fast  mmap  workers=10    1114166 req     0.902s     1235295 req/s    5959.6 MB/
+old fast  mmap  workers=10    1114166 req     0.904s     1232958 req/s    5948.3 MB/
+new fast  mmap  workers=1     1114166 req     4.862s      229154 req/s    1105.5 MB/
+old fast  mmap  workers=1     1114166 req     4.876s      228503 req/s    1102.4 MB/
+old fast  mmap  workers=10    1114166 req     0.902s     1235287 req/s    5959.6 MB/
+new fast  mmap  workers=10    1114166 req     0.898s     1240334 req/s    5983.9 MB/
+old fast  mmap  workers=1     1114166 req     4.892s      227768 req/s    1098.9 MB/
+new fast  mmap  workers=1     1114166 req     4.848s      229827 req/s    1108.8 MB/
+== 2. end-to-end stream, simdjson
+old stream simdjson readers=4 workers=10   1114166 req     2.945s     378272 req/s  
+new stream simdjson readers=4 workers=10   1114166 req     2.932s     379999 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    13.417s      83040 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    13.326s      83607 req/s  
+new stream simdjson readers=4 workers=10   1114166 req     2.961s     376277 req/s  
+old stream simdjson readers=4 workers=10   1114166 req     2.958s     376641 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    13.395s      83175 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    13.325s      83618 req/s  
+old stream simdjson readers=4 workers=10   1114166 req     2.934s     379757 req/s  
+new stream simdjson readers=4 workers=10   1114166 req     2.971s     375004 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    13.193s      84451 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    13.208s      84358 req/s  
+# load after: 0.2% CPU total, swap 0.00M
+| label | mode | workers | readers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| old-matcher-only | fast | 10 | - | 1114166 | 3 | 0.904 | 0.902 | 0.907 | 1232958 | 5948 | 5.41x | 54% |
+| new-matcher-only | fast | 10 | - | 1114166 | 3 | 0.902 | 0.898 | 0.904 | 1235295 | 5960 | 5.39x | 54% |
+| old-matcher-only | fast | 1 | - | 1114166 | 3 | 4.892 | 4.876 | 4.910 | 227768 | 1099 | 1.00x | 100% |
+| new-matcher-only | fast | 1 | - | 1114166 | 3 | 4.862 | 4.848 | 4.869 | 229154 | 1106 | 1.00x | 100% |
+| old-stream | fast | 10 | 4 | 1114166 | 3 | 2.945 | 2.934 | 2.958 | 378272 | 1825 | 4.52x | 45% |
+| new-stream | fast | 10 | 4 | 1114166 | 3 | 2.961 | 2.932 | 2.971 | 376277 | 1815 | 4.50x | 45% |
+| old-stream | fast | 1 | 1 | 1114166 | 3 | 13.325 | 13.193 | 13.417 | 83618 | 403 | 1.00x | 100% |
+| new-stream | fast | 1 | 1 | 1114166 | 3 | 13.326 | 13.208 | 13.395 | 83607 | 403 | 1.00x | 100% |
