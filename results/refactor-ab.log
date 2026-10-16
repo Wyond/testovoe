@@ -1,0 +1,55 @@
+# E26: old (ea769bf) vs new binary, alternating, 20 s pause; stream and matcher-only interleaved
+old stream simdjson readers=4 workers=10   1114166 req     4.222s     263882 req/s  
+new stream simdjson readers=4 workers=10   1114166 req     4.636s     240334 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    15.347s      72596 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    17.023s      65451 req/s  
+old fast  mmap  workers=10    1114166 req     4.788s      232707 req/s    1122.7 MB/
+new fast  mmap  workers=10    1114166 req     2.286s      487387 req/s    2351.4 MB/
+old fast  mmap  workers=1     1114166 req     7.990s      139448 req/s     672.8 MB/
+new fast  mmap  workers=1     1114166 req     8.111s      137364 req/s     662.7 MB/
+new stream simdjson readers=4 workers=10   1114166 req     3.758s     296497 req/s  
+old stream simdjson readers=4 workers=10   1114166 req     3.513s     317174 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    15.245s      73086 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    16.027s      69518 req/s  
+new fast  mmap  workers=10    1114166 req     4.283s      260166 req/s    1255.2 MB/
+old fast  mmap  workers=10    1114166 req     1.796s      620342 req/s    2992.8 MB/
+new fast  mmap  workers=1     1114166 req     8.983s      124028 req/s     598.4 MB/
+old fast  mmap  workers=1     1114166 req     7.402s      150532 req/s     726.2 MB/
+old stream simdjson readers=4 workers=10   1114166 req     4.657s     239225 req/s  
+new stream simdjson readers=4 workers=10   1114166 req     3.591s     310280 req/s  
+old stream simdjson readers=1 workers=1    1114166 req    18.360s      60686 req/s  
+new stream simdjson readers=1 workers=1    1114166 req    15.447s      72126 req/s  
+old fast  mmap  workers=10    1114166 req     4.060s      274396 req/s    1323.8 MB/
+new fast  mmap  workers=10    1114166 req     1.325s      840904 req/s    4056.9 MB/
+old fast  mmap  workers=1     1114166 req     5.556s      200549 req/s     967.5 MB/
+new fast  mmap  workers=1     1114166 req     6.656s      167395 req/s     807.6 MB/
+| label | mode | workers | readers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| old-stream | fast | 10 | 4 | 1114166 | 3 | 4.222 | 3.513 | 4.657 | 263882 | 1273 | 3.80x | 38% |
+| new-stream | fast | 10 | 4 | 1114166 | 3 | 3.758 | 3.591 | 4.636 | 296497 | 1430 | 4.11x | 41% |
+| old-stream | fast | 1 | 1 | 1114166 | 3 | 16.027 | 15.347 | 18.360 | 69518 | 335 | 1.00x | 100% |
+| new-stream | fast | 1 | 1 | 1114166 | 3 | 15.447 | 15.245 | 17.023 | 72126 | 348 | 1.00x | 100% |
+| old-matcher-only | fast | 10 | - | 1114166 | 3 | 4.060 | 1.796 | 4.788 | 274396 | 1324 | 1.82x | 18% |
+| new-matcher-only | fast | 10 | - | 1114166 | 3 | 2.286 | 1.325 | 4.283 | 487387 | 2351 | 3.55x | 35% |
+| old-matcher-only | fast | 1 | - | 1114166 | 3 | 7.402 | 5.556 | 7.990 | 150532 | 726 | 1.00x | 100% |
+| new-matcher-only | fast | 1 | - | 1114166 | 3 | 8.111 | 6.656 | 8.983 | 137364 | 663 | 1.00x | 100% |
+
+# E26: matcher-only only, warmed cache; background load present (Chrome ~75% CPU, swap 3.2 GB)
+old fast  mmap  workers=10    1114166 req     1.521s      732651 req/s    3534.6 MB/
+new fast  mmap  workers=10    1114166 req     2.213s      503439 req/s    2428.8 MB/
+old fast  mmap  workers=1     1114166 req     6.932s      160731 req/s     775.4 MB/
+new fast  mmap  workers=1     1114166 req     8.169s      136396 req/s     658.0 MB/
+new fast  mmap  workers=10    1114166 req     2.205s      505359 req/s    2438.1 MB/
+old fast  mmap  workers=10    1114166 req     1.670s      667355 req/s    3219.6 MB/
+new fast  mmap  workers=1     1114166 req     7.157s      155671 req/s     751.0 MB/
+old fast  mmap  workers=1     1114166 req     7.851s      141920 req/s     684.7 MB/
+old fast  mmap  workers=10    1114166 req     2.533s      439849 req/s    2122.0 MB/
+new fast  mmap  workers=10    1114166 req     1.989s      560231 req/s    2702.8 MB/
+old fast  mmap  workers=1     1114166 req     7.448s      149583 req/s     721.7 MB/
+new fast  mmap  workers=1     1114166 req     7.805s      142742 req/s     688.7 MB/
+| label | mode | workers | readers | requests | runs | median s | min s | max s | req/s | MB/s | speedup | efficiency |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| old-matcher-only | fast | 10 | - | 1114166 | 3 | 1.670 | 1.521 | 2.533 | 667355 | 3220 | 4.46x | 45% |
+| new-matcher-only | fast | 10 | - | 1114166 | 3 | 2.205 | 1.989 | 2.213 | 505359 | 2438 | 3.54x | 35% |
+| old-matcher-only | fast | 1 | - | 1114166 | 3 | 7.448 | 6.932 | 7.851 | 149583 | 722 | 1.00x | 100% |
+| new-matcher-only | fast | 1 | - | 1114166 | 3 | 7.805 | 7.157 | 8.169 | 142742 | 689 | 1.00x | 100% |

@@ -18,7 +18,8 @@ import (
 //
 // Ownership: a chunk buffer is the reader's until it is put into the queue, then the
 // receiving worker's until it releases it; results reach the writer by value. Shared
-// state is limited to the queue, the file claims and the failure below.
+// state is limited to the queue, the file claims, the failure below and, among the
+// readers, the fileReader's read-block free list and atomic counters.
 
 type StreamConfig struct {
 	Mode      string // "fast" or "naive"
@@ -122,9 +123,9 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 	outs := make(chan streamOut, cfg.QueueJobs+cfg.Workers)
 	counts := make(chan fileCount, len(paths)) // one per file: never blocks
 	reader := &fileReader{q: q, fail: fail, chunkSize: cfg.ChunkSize, freeBlocks: make(chan []byte, 4*cfg.Readers+2)}
-	writer := newIDWriter(len(paths), cfg.Out, fail)
 
 	start := time.Now()
+	writer := newIDWriter(len(paths), cfg.Out, fail)
 	writerDone := make(chan struct{})
 	go func() {
 		defer close(writerDone)
