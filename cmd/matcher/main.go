@@ -461,6 +461,8 @@ func stream(args []string) {
 	fmt.Printf("       parsed by %s: %d, fallback to jx: %d %v; C++ buffer growths %d (%.0f MB, not in Go alloc); read %.2fs (stalled %.2fs), split %.2fs, queue full %.2fs; workers idle %.2fs total\n",
 		ps.Primary, ps.PrimaryMsgs, ps.FallbackMsgs, ps.Reasons, ps.NativeGrowths, float64(ps.NativeGrowthBytes)/1e6,
 		r.ReadSec, r.ReadStallSec, r.SplitSec, r.ReaderWaitSec, r.WorkerIdleSec)
+	fmt.Printf("       worker time, summed over workers: JSON parse+normalize %.2fs, prefilter+regex %.2fs, result formatting %.2fs, output write %.2fs\n",
+		r.ParseSec, r.MatchSec, r.FormatSec, r.WriteSec)
 	if ps.PrimaryMsgs+ps.FallbackMsgs != r.Requests {
 		log.Fatalf("parser counters cover %d messages, %d were processed", ps.PrimaryMsgs+ps.FallbackMsgs, r.Requests)
 	}

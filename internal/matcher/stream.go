@@ -255,6 +255,8 @@ type StreamResult struct {
 	MaxChunk          int
 	Parse             ParserStats
 	SplitOnly         bool
+	// Summed over workers (CPU-ish time inside each stage; the clock reads add ~50 ns per request).
+	ParseSec, MatchSec, FormatSec, WriteSec float64
 }
 
 type streamJob struct {
@@ -309,6 +311,7 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 		stats    = make([]Stats, cfg.Workers)
 		idle     = make([]time.Duration, cfg.Workers)
 		pstats   = make([]ParserStats, cfg.Workers)
+		stage    = make([][4]time.Duration, cfg.Workers) // parse+normalize, match, format, write
 	)
 	fail := func(err error) { failed.CompareAndSwap(nil, &err); cond.Broadcast() }
 	if cfg.Out != nil {
@@ -378,17 +381,22 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 				w.out = w.out[:0]
 				for k, sp := range j.spans {
 					id := j.first + int64(k)
+					t0 := time.Now()
 					norm, err = p.normalize(j.buf[sp.start:sp.end], norm[:0])
 					if err != nil {
 						fail(fmt.Errorf("%s, element %d (request id %d): %w", paths[j.file], k, id, err))
 						break
 					}
+					t1 := time.Now()
 					var ids []uint32
 					if fast {
 						ids = m.MatchFast(norm, w)
 					} else {
 						ids = m.MatchNaive(norm, w)
 					}
+					t2 := time.Now()
+					stage[wi][0] += t1.Sub(t0)
+					stage[wi][1] += t2.Sub(t1)
 					w.Stats.Requests++
 					w.Stats.Bytes += int64(len(norm))
 					w.Stats.Matches += int64(len(ids))
@@ -398,11 +406,13 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 					from := len(w.out)
 					w.out = m.appendResult(w.out, int(id), ids, w)
 					j.hashes[k] = maphash.Bytes(streamSeed, w.out[from:]) | 1
+					stage[wi][2] += time.Since(t2)
 					if cap(norm) > maxKeptBuffer || sp.end-sp.start > maxKeptBuffer {
 						norm = make([]byte, 0, 64<<10)
 						p.trim()
 					}
 				}
+				tw := time.Now()
 				if out != nil && failed.Load() == nil {
 					outMu.Lock()
 					if _, err := out.Write(w.out); err != nil {
@@ -410,6 +420,7 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 					}
 					outMu.Unlock()
 				}
+				stage[wi][3] += time.Since(tw)
 				if cap(w.out) > maxKeptBuffer {
 					w.out = nil
 				}
@@ -593,6 +604,12 @@ func RunStream(m *Matcher, paths []string, cfg StreamConfig) (*StreamResult, err
 	}
 	for _, d := range idle {
 		res.WorkerIdleSec += d.Seconds()
+	}
+	for _, st := range stage {
+		res.ParseSec += st[0].Seconds()
+		res.MatchSec += st[1].Seconds()
+		res.FormatSec += st[2].Seconds()
+		res.WriteSec += st[3].Seconds()
 	}
 	var ms runtime.MemStats
 	runtime.ReadMemStats(&ms)
