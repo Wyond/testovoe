@@ -20,6 +20,9 @@ import (
 	"waap-matcher/internal/matcher"
 )
 
+// extraCommands are commands that exist only with some build tags.
+var extraCommands = map[string]func([]string){}
+
 func main() {
 	log.SetFlags(0)
 	if len(os.Args) < 2 {
@@ -48,6 +51,10 @@ func main() {
 		defer s.Close()
 		fmt.Print(matcher.SizeProfile(m, s))
 	default:
+		if f, ok := extraCommands[cmd]; ok {
+			f(args)
+			return
+		}
 		log.Fatalf("unknown command %q", cmd)
 	}
 }

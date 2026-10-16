@@ -7,6 +7,7 @@
 #   WORKERS="1 2 4 8" REPEATS=3 BASELINE=100000 PAUSE=0 scripts/run.sh
 #   PARSER=jx scripts/run.sh                               # control run: jx instead of simdjson
 #   READERS=1 scripts/run.sh                               # files read one at a time (default 4 in parallel)
+#   ORACLE=0 scripts/run.sh                                # nmap-semantics comparison on all requests (~6 min)
 #   ENGINES=go PARSER=jx scripts/run.sh                    # no native libraries at all
 #
 # Two modes are measured and reported separately:
@@ -156,6 +157,13 @@ done
 echo "== 2. matcher-only: correctness (naive vs fast, 1 vs N workers, mmap vs pread)"
 FULL=-full; [ -n "${QUICK:-}" ] && FULL=""
 bin/matcher check "${C[@]}" -corpus "$CORPUS" -sample 20000 $FULL | grep -E '^(OK|FAIL)'
+
+if [ "$MAIN_LABEL" != go ]; then
+  # Byte-mode PCRE2 on every rule, no prefilter: stands in for nmap's own matching.
+  ORACLE=${ORACLE:-50000}; [ -n "${QUICK:-}" ] && ORACLE=5000
+  echo "== 2. matcher-only: comparison with nmap semantics (PCRE2 on bytes), $ORACLE requests (0 = all)"
+  bin/matcher oracle "${C[@]}" -corpus "$CORPUS" -sample "$ORACLE" | sed -n '/^reference/,$p'
+fi
 
 echo "== 2. matcher-only: baseline, naive single-threaded, $BASELINE requests spread over the corpus"
 # The naive pass is slow by definition and depends only on the code, the rules, the engine

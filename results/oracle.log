@@ -1,0 +1,25 @@
+engines map[go:11352 pcre2:807 re2:6 rure:7] (807 recovered from the Go-unsupported set by "pcre2"); rules: 12172 match/softmatch lines in 188 probes, 1250 services; 12172 compiled by the engine (11969 match, 203 softmatch; flag i 35, flag s 3303), 0 unsupported (0.0%), 0 unparsed lines
+filter: 11735 patterns behind a start-of-text prefix (6808 distinct prefixes, largest two-byte bucket 2388), 391 behind a required literal (283 distinct literals, 9 of them shorter than 4 bytes), 46 always candidates; 2158 patterns also have an end-of-text condition (length bound or last byte), 321 a first-byte class; 8 patterns of the form (?s)^.*X confirmed as X
+corpus: 1114166 requests, 5375 MB normalized; rule initialization 0.25s
+
+эталон: каждое правило скомпилировано PCRE2 в байтовом режиме (без UTF, только флаги i/s), без предфильтра; 407.8 с
+запросов 1114166: с не-ASCII байтами 23018 (2.066%), с невалидным UTF-8 0 (0.000%); эталон упёрся в лимит перебора 3521 раз
+совпадений правил: у нас 1426540, у эталона 1426573
+запросов, где различаются сработавшие правила: 33 (0.003%); строка вывода: 33 (0.003%); первый hard-сервис: 33 (0.003%)
+правил с расхождением или с лимитом у эталона: 13 из 12172 (при лимите правило в этом запросе не сравнивается)
+
+| строка | проба | тип | сервис | наш движок | только у эталона (ASCII-запросы) | только у нас (ASCII-запросы) | лимит эталона: у нас есть / нет | пример id | правило |
+|---:|---|---|---|---|---:|---:|---:|---:|---|
+| 5297 | TCP NULL | match | landesk-rc | pcre2 | 33 (33) | 0 (0) | 0 / 0 | 1051310 | `^(?!HTTP\|RTSP\|SIP).{264}$` s |
+| 569 | TCP NULL | match | eggdrop | pcre2 | 0 (0) | 0 (0) | 0 / 351 | -1 | `^(?>.*?\(Eggdrop v([\d.]+) \(C\) 1997 Robey Pointer).*?Eggheads` s |
+| 570 | TCP NULL | match | eggdrop | pcre2 | 0 (0) | 0 (0) | 0 / 351 | -1 | `^(?>.*?\(Eggdrop v([\d.]+)\+(\S+) \(C\) 1997 Robey Pointer).*?Eggheads` s |
+| 1962 | TCP NULL | match | ixia-unknown | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*\0\x18Ixia Hardware I/O Server\x13Ixia Communications\x18Ixia Hardw…` s |
+| 2172 | TCP NULL | match | donkey | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*\0\0\0\x06\0Donkey\x01\x0c\0\./donkey\.ini\0\0\0\0\0\0\0\0\0\0\0\0\…` s |
+| 10688 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*<address>Apache/([\d.]+) \([^)]+\) ?(.*) Server at ([-\w_.]+) Port …` si |
+| 10689 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*<address>Apache/([\d.]+) \([^)]+\) Server at ([-\w_.]+) Port \d+</a…` si |
+| 10690 | TCP GetRequest | match | http | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*<address>Apache/([\d.]+) Server at ([-\w_.]+) Port \d+</address>\n<…` si |
+| 13006 | TCP DNSVersionBindReqTCP | match | qcheck | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*\$Id: //ral_depot/products/current/ENDPOINT/CODE/client\.c` s |
+| 14045 | TCP SMBProgNeg | match | kerberos-sec | go | 0 (0) | 0 (0) | 0 / 351 | -1 | `^.*Internal KDC error, contact administrator` s |
+| 16280 | TCP mongodb | match | mongodb | go | 0 (0) | 0 (0) | 5 / 345 | -1 | `^.*version.....([\.\d]+)` s |
+| 16317 | UDP pc-duo | match | pc-duo | rure | 0 (0) | 0 (0) | 0 / 6 | -1 | `^.........(.*)\0` s |
+| 16324 | UDP pc-duo-gw | match | pc-duo-gw | rure | 0 (0) | 0 (0) | 0 / 6 | -1 | `^.........(.*)\0` s |
